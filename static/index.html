@@ -283,6 +283,8 @@
     return v === null ? !existingUser : v === "1";
   };
   $("vat").checked = defaultApplyTax();
+  // Record the default once, so it doesn't change on later visits.
+  if (store.get("qm_vat") === null) store.set("qm_vat", $("vat").checked ? "1" : "0");
   $("q_notes").value = store.get("qm_notes") ?? DEFAULT_NOTES;
   $("q_notes").addEventListener("input", () => { if (!exampleActive) store.set("qm_notes", $("q_notes").value); });
 
@@ -336,11 +338,22 @@
   let savedTax = null;
   try { savedTax = sanitizeTax(JSON.parse(store.get("qm_tax") || "null")); } catch {}
   let TAX = savedTax || fromPreset(existingUser ? "GB" : detectCountry());
+  // Decide the country once and save it, so a reload never re-guesses
+  // (a new visitor's own draft would otherwise make them look "existing").
+  const firstTaxRun = !savedTax;
+  if (firstTaxRun) {
+    savedTax = { ...TAX, lines: TAX.lines.map((l) => ({ ...l })) };
+    store.set("qm_tax", JSON.stringify(savedTax));
+  }
   let taxFromLink = false; // a link's settings apply to this visit only
 
   const taxLinesText = (t) => t.lines.map((l) => `${l.label} ${l.rate}%`).join(" + ");
   function taxApplies() { return TAX.registered && TAX.lines.length > 0 && $("vat").checked; }
-  function saveTax() { if (!taxFromLink) store.set("qm_tax", JSON.stringify(TAX)); }
+  function saveTax() {
+    if (taxFromLink) return;
+    savedTax = { ...TAX, lines: TAX.lines.map((l) => ({ ...l })) };
+    store.set("qm_tax", JSON.stringify(savedTax));
+  }
 
   function renderTaxForm() {
     const c = COUNTRIES[TAX.country];
@@ -422,7 +435,7 @@
   $("taxcard").addEventListener("toggle", () => { if ($("taxcard").open) store.set("qm_tax_seen", "1"); recalc(); });
   $("link_banner_change").addEventListener("click", () => { $("taxcard").open = true; $("taxcard").scrollIntoView({ behavior: "smooth" }); });
   // First visit outside the UK: show the settings so they can be checked.
-  if (!savedTax && TAX.country !== "GB") $("taxcard").open = true;
+  if (firstTaxRun && TAX.country !== "GB") $("taxcard").open = true;
 
   // Link parameters (e.g. ?country=AU&tax_rate=10) set tax for this visit only.
   const TAX_KEYS = ["country", "province", "tax_label", "tax_rate", "tax2_label", "tax2_rate", "tax_inclusive", "registered", "currency", "title", "paper", "labour_taxable"];
@@ -960,6 +973,8 @@
   } else {
     startFresh();
   }
+  // Keep a link's tax settings with the open draft, even before any edit.
+  if (taxFromLink) saveDraft();
   document.querySelector("main").addEventListener("input", (e) => {
     if (e.target.closest("#biz") || e.target.type === "file") return;
     editedAfterSend(e.target);

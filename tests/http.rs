@@ -222,3 +222,29 @@ async fn logo_downloads_are_rate_limited_per_client() {
         StatusCode::UNPROCESSABLE_ENTITY
     );
 }
+
+#[tokio::test]
+async fn pdf_limit_is_checked_before_the_body_is_read() {
+    std::env::set_var("TRUSTED_CLIENT_IP_HEADER", "x-test-client");
+    let send = |body: String| async move {
+        open_quote::app()
+            .oneshot(
+                Request::post("/api/quote.pdf")
+                    .header("content-type", "application/json")
+                    .header("x-test-client", "203.0.113.77")
+                    .body(Body::from(body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap()
+            .status()
+    };
+    for _ in 0..60 {
+        assert_eq!(send(valid().to_string()).await, StatusCode::OK);
+    }
+    // Over the limit: rejected with 429 even for an oversized body, which
+    // would otherwise be read (and refused with 413) first.
+    let mut huge = valid();
+    huge["notes"] = json!("a".repeat(7 * 1024 * 1024));
+    assert_eq!(send(huge.to_string()).await, StatusCode::TOO_MANY_REQUESTS);
+}

@@ -6,7 +6,7 @@ All notable changes to this project are documented here. The format is based on 
 
 ### Added
 - Any-country tax: presets for UK, Ireland, Australia, New Zealand, Canada (provinces), US and South Africa; up to two tax lines; tax-inclusive prices with a prominent "Total (incl. GST)"; per-line taxable; currency, paper size (A4/Letter) and document title. All settable by link (`country=AU` …).
-- Per-visitor rate limits: 30 logo downloads / 10 min, 60 PDFs / min (`429` + `Retry-After`). `TRUSTED_CLIENT_IP_HEADER` for proxies.
+- Per-visitor rate limits: 30 logo downloads / 10 min, 60 PDFs / min (`429` + `Retry-After`). `TRUSTED_CLIENT_IP_HEADER` for proxies. The PDF limit is checked before the request body is read.
 
 ## [0.1.0] - 2026-11-20
 

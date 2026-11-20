@@ -19,6 +19,12 @@ const { chromium, devices } = require("playwright");
       savedTax: localStorage.getItem("qm_tax"),
     }));
     let r = await read();
+    if (name.startsWith("new visitor")) {
+      // Second load: the detected country must stick once a draft exists.
+      await page.fill("#c_name", "Second load"); await page.locator("#c_name").blur();
+      await page.reload({ waitUntil: "networkidle" });
+      r.secondLoad = (await read()).summary;
+    }
     if (name === "link-reload") { await page.reload({ waitUntil: "networkidle" }); r.afterReload = await read();
       await page.click("#new_quote"); await page.click("#new_quote"); r.afterNewQuote = await read(); }
     results.push([name, r]);

@@ -39,7 +39,12 @@ pub fn app() -> Router {
         .route("/healthz", get(|| async { "ok" }))
         .route("/api/stats", get(stats))
         .route("/api/logo", get(fetch_logo))
-        .route("/api/quote.pdf", post(make_pdf))
+        .route(
+            "/api/quote.pdf",
+            // The limit runs as middleware, before the (up to 6 MB) body is
+            // read, so an over-limit client can't make us buffer uploads.
+            post(make_pdf).route_layer(middleware::from_fn(limit_pdf)),
+        )
         .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
         .layer(middleware::map_response(security_headers))
 }
@@ -159,13 +164,18 @@ fn filename_for(quote_number: &str) -> String {
     }
 }
 
-async fn make_pdf(
+async fn limit_pdf(
     ratelimit::ClientIp(ip): ratelimit::ClientIp,
-    payload: Result<Json<quote::QuoteRequest>, JsonRejection>,
+    request: axum::extract::Request,
+    next: middleware::Next,
 ) -> Response {
     if let Err(wait) = PDF_LIMIT.check(ip) {
         return too_many(wait, "quotes in a short time");
     }
+    next.run(request).await
+}
+
+async fn make_pdf(payload: Result<Json<quote::QuoteRequest>, JsonRejection>) -> Response {
     let req = match payload {
         Ok(Json(req)) => req,
         Err(rejection) => {
