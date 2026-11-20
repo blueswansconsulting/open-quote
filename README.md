@@ -155,7 +155,8 @@ https://quotes.example.com/#customer_name=Mrs%20Jones&customer_address=2%20Low%2
 
 ### Live examples with UTM tracking
 
-- **Everything filled in (one click to a PDF):** [`…?utm_source=crm&utm_medium=email&utm_campaign=quote-follow-up#demo`](https://openquote.tradesites.ai/?utm_source=crm&utm_medium=email&utm_campaign=quote-follow-up#demo). `#demo` loads a made-up business, customer and quote, and doesn't change anyone's saved settings.
+- **Everything filled in (one click to a PDF):** [`…?utm_source=crm&utm_medium=email&utm_campaign=quote-follow-up#demo`](https://openquote.tradesites.ai/?utm_source=crm&utm_medium=email&utm_campaign=quote-follow-up#demo).
+- **The same, with a logo from a link:** [`…#demo&logo=https%3A%2F%2Fwww.tradesites.ai%2Flogo.svg`](https://openquote.tradesites.ai/?utm_source=crm&utm_medium=email&utm_campaign=quote-follow-up#demo&logo=https%3A%2F%2Fwww.tradesites.ai%2Flogo.svg). The logo is fetched safely (see below) and used for this quote only. `#demo` loads a made-up business, customer and quote, and doesn't change anyone's saved settings.
 - **Customer and job from your CRM (below):** the trade's own saved business details complete the quote.
 
 **[Open this link on the live demo](https://openquote.tradesites.ai/?utm_source=crm&utm_medium=email&utm_campaign=quote-follow-up#customer_name=Mrs%20Jones&customer_address=2%20Low%20Road%0ABristol&job=Replace%20consumer%20unit%20and%20certify&item=Consumer%20unit%20(10-way%20RCBO)%7C1%7C285%7Cmaterials&item=Labour%7C8%7C45%7Clabour&vat=1)**

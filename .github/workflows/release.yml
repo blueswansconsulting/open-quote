@@ -1,8 +1,8 @@
 name: Release image
 
+# Manual-only (Actions minutes): run from the Actions tab to publish the
+# image to GHCR for an existing tag.
 on:
-  push:
-    tags: ["v*"]
   workflow_dispatch:
 
 permissions:

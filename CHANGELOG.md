@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-20
+
 ### Added
 - `logo=` in prefill links: fetches a public https logo (JPEG/PNG/GIF/WebP/SVG) with SSRF protections; used for that quote only.
 - Listing links accept a bare domain (`tradesites.ai` becomes `https://tradesites.ai`).
@@ -15,7 +17,6 @@ All notable changes to this project are documented here. The format is based on 
 - Live demo at https://openquote.tradesites.ai/.
 - Example mode: `#demo` links and a "Try an example quote" button fill in a complete made-up quote without touching saved settings.
 
-## [0.1.0] - 2026-11-20
 
 ### Added
 - Example roofing and solar quotes in `examples/`.
