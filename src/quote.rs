@@ -6,9 +6,9 @@
 use base64::Engine;
 use serde::Deserialize;
 
-use crate::pdf::Jpeg;
+use crate::pdf::{Jpeg, Paper};
+use crate::tax::{self, TaxAmount, TaxInput, TaxSetup};
 
-pub const VAT_RATE_PERCENT: i64 = 20;
 pub const MAX_ITEMS: usize = 100;
 pub const MAX_PHOTOS: usize = 3;
 pub const MAX_LOGO_BYTES: usize = 300 * 1024;
@@ -42,6 +42,13 @@ pub struct LineItem {
     /// Optional: "labour" or "materials".
     #[serde(default)]
     pub kind: String,
+    /// Whether tax applies to this line (default yes).
+    #[serde(default = "yes")]
+    pub taxable: bool,
+}
+
+fn yes() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -68,8 +75,24 @@ pub struct QuoteRequest {
     #[serde(default)]
     pub scope: String,
     pub items: Vec<LineItem>,
+    /// Legacy UK switch: VAT at 20% when `tax` is absent.
     #[serde(default)]
     pub vat: bool,
+    /// Tax lines for any country. Overrides `vat` when present.
+    #[serde(default)]
+    pub tax: Option<TaxInput>,
+    /// Currency symbol, e.g. "£", "$", "€", "R" (default "£").
+    #[serde(default)]
+    pub currency: String,
+    /// "a4" (default) or "letter".
+    #[serde(default)]
+    pub paper: String,
+    /// "Quote", "Quotation" or "Estimate" (any short word; default "Quote").
+    #[serde(default)]
+    pub title: String,
+    /// Label for the registration number, e.g. "VAT no.", "ABN", "GST no.".
+    #[serde(default)]
+    pub reg_label: String,
     #[serde(default)]
     pub notes: String,
     /// Trust line, e.g. "Verified on Electricians Ranked".
@@ -112,6 +135,7 @@ pub struct PricedLine {
     pub quantity_hundredths: i64,
     pub unit_pence: i64,
     pub total_pence: i64,
+    pub taxable: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -119,7 +143,10 @@ pub struct Totals {
     pub labour: i64,
     pub materials: i64,
     pub subtotal: i64,
-    pub vat: i64,
+    /// Sum of the taxable lines.
+    pub taxable: i64,
+    /// Sum of all tax lines.
+    pub tax: i64,
     pub total: i64,
 }
 
@@ -138,7 +165,12 @@ pub struct Quote {
     pub date: String,
     pub valid_until: String,
     pub scope: String,
-    pub vat: bool,
+    pub tax: TaxSetup,
+    pub taxes: Vec<TaxAmount>,
+    pub currency: String,
+    pub paper: Paper,
+    pub title: String,
+    pub reg_label: String,
     pub notes: String,
     pub footer_note: String,
     pub footer_link: String,
@@ -159,7 +191,7 @@ pub fn line_total(quantity_hundredths: i64, unit_pence: i64) -> i64 {
     (quantity_hundredths * unit_pence + 50) / 100
 }
 
-pub fn totals(lines: &[PricedLine], vat: bool) -> Totals {
+pub fn totals(lines: &[PricedLine], setup: &TaxSetup) -> (Totals, Vec<TaxAmount>) {
     let sum_of = |kind| {
         lines
             .iter()
@@ -168,18 +200,21 @@ pub fn totals(lines: &[PricedLine], vat: bool) -> Totals {
             .sum()
     };
     let subtotal: i64 = lines.iter().map(|l| l.total_pence).sum();
-    let vat_amount = if vat {
-        (subtotal * VAT_RATE_PERCENT + 50) / 100
-    } else {
-        0
-    };
-    Totals {
+    let taxable: i64 = lines
+        .iter()
+        .filter(|l| l.taxable)
+        .map(|l| l.total_pence)
+        .sum();
+    let (taxes, total) = tax::compute(subtotal, taxable, setup);
+    let totals = Totals {
         labour: sum_of(ItemKind::Labour),
         materials: sum_of(ItemKind::Materials),
         subtotal,
-        vat: vat_amount,
-        total: subtotal + vat_amount,
-    }
+        taxable,
+        tax: taxes.iter().map(|t| t.amount).sum(),
+        total,
+    };
+    (totals, taxes)
 }
 
 /// Turn tabs into spaces, remove other control characters, and keep
@@ -349,6 +384,7 @@ pub fn validate(req: QuoteRequest) -> Result<Quote, String> {
             quantity_hundredths,
             unit_pence,
             total_pence: line_total(quantity_hundredths, unit_pence),
+            taxable: item.taxable,
         });
     }
 
@@ -370,7 +406,36 @@ pub fn validate(req: QuoteRequest) -> Result<Quote, String> {
         });
     }
 
-    let totals = totals(&lines, req.vat);
+    let tax_setup = tax::setup(req.tax.clone(), req.vat)?;
+    let (totals, taxes) = totals(&lines, &tax_setup);
+    let currency = clean(&req.currency, false);
+    let currency = if currency.is_empty() {
+        "£".to_string()
+    } else {
+        currency
+    };
+    if currency.chars().count() > 4 || currency.chars().any(|c| c.is_ascii_digit()) {
+        return Err("Currency should be a short symbol, like £, $ or €".into());
+    }
+    let paper = match req.paper.trim().to_ascii_lowercase().as_str() {
+        "" | "a4" => Paper::A4,
+        "letter" => Paper::Letter,
+        _ => return Err("Paper must be A4 or Letter".into()),
+    };
+    let title = clean(&req.title, false);
+    let title = if title.is_empty() {
+        "Quote".to_string()
+    } else {
+        title
+    };
+    check_len("Document title", &title, 20)?;
+    let reg_label = clean(&req.reg_label, false);
+    let reg_label = if reg_label.is_empty() {
+        "VAT no.".to_string()
+    } else {
+        reg_label
+    };
+    check_len("Registration label", &reg_label, 30)?;
     Ok(Quote {
         business,
         customer,
@@ -378,7 +443,12 @@ pub fn validate(req: QuoteRequest) -> Result<Quote, String> {
         date,
         valid_until,
         scope,
-        vat: req.vat,
+        tax: tax_setup,
+        taxes,
+        currency,
+        paper,
+        title,
+        reg_label,
         notes,
         footer_note,
         footer_link,
@@ -392,6 +462,11 @@ pub fn validate(req: QuoteRequest) -> Result<Quote, String> {
 
 /// `123456` -> `"£1,234.56"`.
 pub fn format_money(pence: i64) -> String {
+    format_money_in("£", pence)
+}
+
+/// `("$", 123456)` -> `"$1,234.56"`.
+pub fn format_money_in(symbol: &str, pence: i64) -> String {
     let negative = pence < 0;
     let pence = pence.abs();
     let pounds = (pence / 100).to_string();
@@ -403,7 +478,7 @@ pub fn format_money(pence: i64) -> String {
         grouped.push(ch);
     }
     format!(
-        "{}£{}.{:02}",
+        "{}{symbol}{}.{:02}",
         if negative { "-" } else { "" },
         grouped,
         pence % 100
@@ -431,6 +506,7 @@ pub(crate) mod tests {
             quantity,
             unit_price,
             kind: String::new(),
+            taxable: true,
         }
     }
 
@@ -450,6 +526,11 @@ pub(crate) mod tests {
             scope: String::new(),
             items,
             vat,
+            tax: None,
+            currency: String::new(),
+            paper: String::new(),
+            title: String::new(),
+            reg_label: String::new(),
             notes: String::new(),
             footer_note: String::new(),
             footer_link: String::new(),
@@ -475,7 +556,7 @@ pub(crate) mod tests {
         ))
         .unwrap();
         assert_eq!(
-            (q.totals.subtotal, q.totals.vat, q.totals.total),
+            (q.totals.subtotal, q.totals.tax, q.totals.total),
             (72_000, 14_400, 86_400)
         );
     }
@@ -484,7 +565,7 @@ pub(crate) mod tests {
     fn totals_without_vat() {
         let q = validate(request(vec![item("Socket", 3.0, 12.5)], false)).unwrap();
         assert_eq!(
-            (q.totals.subtotal, q.totals.vat, q.totals.total),
+            (q.totals.subtotal, q.totals.tax, q.totals.total),
             (3_750, 0, 3_750)
         );
     }
@@ -527,7 +608,7 @@ pub(crate) mod tests {
     #[test]
     fn vat_rounds_half_up() {
         let q = validate(request(vec![item("Fuse", 1.0, 2.53)], true)).unwrap();
-        assert_eq!(q.totals.vat, 51); // 0.506 -> 0.51
+        assert_eq!(q.totals.tax, 51); // 0.506 -> 0.51
         assert_eq!(q.totals.total, 304);
     }
 

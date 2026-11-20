@@ -102,9 +102,12 @@ async fn main() -> ExitCode {
         "Open Quote {} running at http://{local}",
         env!("CARGO_PKG_VERSION")
     );
-    if let Err(e) = axum::serve(listener, open_quote::app())
-        .with_graceful_shutdown(shutdown_signal())
-        .await
+    if let Err(e) = axum::serve(
+        listener,
+        open_quote::app().into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .with_graceful_shutdown(shutdown_signal())
+    .await
     {
         eprintln!("open-quote: server error: {e}");
         return ExitCode::from(1);

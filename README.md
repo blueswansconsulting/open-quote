@@ -103,8 +103,50 @@ Open Quote is configured through environment variables only. See [`.env.example`
 |---|---|---|
 | `HOST` | `127.0.0.1` (`0.0.0.0` in Docker) | Address to listen on. Hostnames such as `localhost` and IPv6 (`::`) work. |
 | `PORT` | `8790` | Port to listen on. An invalid value stops start-up with an error. |
+| `TRUSTED_CLIENT_IP_HEADER` | *(unset)* | Header that carries the visitor's real IP, for rate limiting behind a proxy: `cf-connecting-ip` (Cloudflare), or `x-real-ip` / `x-forwarded-for` (your own proxy). Only set it if *every* request comes through that proxy, because visitors can send the header themselves. |
+
+**Rate limits (per visitor):** 30 logo downloads per 10 minutes and 60 PDFs per minute. Requests over the limit get `429` with `Retry-After`. Logo downloads are also capped at 4 at a time across all visitors.
 
 There is nothing else to configure. Open Quote is stateless, so it needs no volume and no database.
+
+## Any country: tax, currency and paper
+
+Open Quote isn't UK-only. The **Country and tax** card (collapsed, with a one-line summary) has presets that the trade can change:
+
+| Country | Tax preset | Prices | Registration label | Paper / title |
+|---|---|---|---|---|
+| United Kingdom | VAT 20% | Added on top | VAT no. | A4 / Quote |
+| Ireland | VAT 23% (set 13.5% for construction) | Included | VAT no. | A4 / Quotation |
+| Australia | GST 10% | **Included**: the GST-inclusive total is the most prominent figure | ABN (shown even if not GST-registered) | A4 / Quote |
+| New Zealand | GST 15% | Included | GST no. | A4 / Quote |
+| Canada | Province picker: HST 13–15%, GST 5%, GST + PST, GST + QST 9.975% | Added on top, one line per tax | GST/HST no. | Letter / Estimate |
+| United States | Sales tax (enter your local rate); labour not taxed by default | Added on top, with a "Taxable amount" row | Licence no. (optional) | Letter / Estimate |
+| South Africa | VAT 15% | Included | VAT no. | A4 / Quotation |
+| Other | Name your own tax(es) | Your choice | Tax no. | Your choice |
+
+- **Registration:** a trade who isn't registered for tax shows no tax, plus a note such as "No GST charged".
+- **Taxable lines:** each line can be marked taxable or not taxed.
+- **Rates:** never looked up. They're common standard rates as of November 2026, so check them with your accountant.
+- **Default country:** the first visit picks it from the browser's language (for example, en-AU picks Australia). The saved settings stay on the device.
+
+**Set by link** (for this visit only; nothing is saved, and a small banner says so):
+
+| Parameter | Example | Notes |
+|---|---|---|
+| `country` | `AU` | `GB`, `IE`, `AU`, `NZ`, `CA`, `US`, `ZA`, `CUSTOM` |
+| `province` | `BC` | Canada only |
+| `tax_label`, `tax_rate` | `GST`, `10` | Rate 0–30%, up to 3 decimals |
+| `tax2_label`, `tax2_rate` | `PST`, `7` | Second tax line |
+| `tax_inclusive` | `1` | Prices already include tax (one tax line only) |
+| `registered` | `0` | Not registered: no tax |
+| `labour_taxable` | `0` | Labour lines not taxed |
+| `currency` | `AUD` or `$` | Code or symbol |
+| `title` | `estimate` | `quote`, `quotation` or `estimate` |
+| `paper` | `letter` | `a4` or `letter` |
+
+Example: [`…/?utm_source=crm#country=CA&province=BC&demo`](https://openquote.tradesites.ai/?utm_source=crm#country=CA&province=BC&demo)
+
+API: send `tax: {lines: [{label, rate}], inclusive, untaxed_note}` plus `currency`, `paper`, `title` and `reg_label`, and `taxable` on each item. The old `vat: true` still means UK VAT at 20%.
 
 ## Running it for real (HTTPS)
 

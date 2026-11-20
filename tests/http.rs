@@ -190,3 +190,35 @@ async fn logo_endpoint_refuses_unsafe_urls() {
         assert!(v["error"].is_string(), "{path}");
     }
 }
+
+#[tokio::test]
+async fn logo_downloads_are_rate_limited_per_client() {
+    // Identify this test's client by a header so other tests aren't affected.
+    std::env::set_var("TRUSTED_CLIENT_IP_HEADER", "x-test-client");
+    let call = |ip: &'static str| async move {
+        let res = open_quote::app()
+            .oneshot(
+                Request::get("/api/logo?url=http%3A%2F%2Fexample.com%2Fl.png")
+                    .header("x-test-client", ip)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        (res.status(), res.headers().get("retry-after").cloned())
+    };
+    for _ in 0..30 {
+        assert_eq!(
+            call("203.0.113.50").await.0,
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
+    }
+    let (status, retry) = call("203.0.113.50").await;
+    assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+    assert!(retry.is_some());
+    // A different client is still served.
+    assert_eq!(
+        call("203.0.113.51").await.0,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+}

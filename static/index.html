@@ -71,12 +71,29 @@
   #fallback a { text-align: center; text-decoration: none; color: var(--ink); border: 1px solid var(--line);
                 border-radius: 8px; padding: 8px; font-size: 14px; }
   [hidden] { display: none !important; }
+  .summary-line { display: block; font-weight: 400; font-size: 14px; color: var(--muted); margin-top: 2px; }
+  .radio-group { border: 0; padding: 0; margin: 10px 0 0; }
+  .radio-group legend { font-size: 15px; font-weight: 500; color: var(--label); margin-bottom: 6px; padding: 0; }
+  .radio { display: flex; gap: 10px; align-items: center; min-height: 44px; padding: 0 12px; margin: 6px 0;
+           border: 1px solid var(--line); border-radius: 8px; color: var(--ink); font-size: 16px; font-weight: 400; }
+  .radio input { width: auto; }
+  .neutral { color: var(--accent); }
+  .tax-link { border: 0; background: none; padding: 0 4px; min-height: 44px; font-size: 14px; color: var(--muted); }
+  .tax-link.off { color: var(--warn); font-weight: 600; }
+  .banner { border: 1px solid var(--accent); border-radius: 10px; padding: 8px 12px; margin: 0 0 12px; font-size: 14px;
+            display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .totals .grand-incl { font-weight: 700; font-size: 22px; border-top: 1px solid var(--line); margin-top: 6px; padding-top: 8px; }
+  .totals .note { justify-content: flex-end; color: var(--muted); font-size: 14px; }
 </style>
 </head>
 <body>
 <main>
   <h1>Open Quote</h1>
   <p class="sub">Make a quote and send it as a PDF. Your details and your current draft are saved on this device only.</p>
+  <div class="banner" id="link_banner" hidden>
+    <span id="link_banner_text"></span>
+    <button type="button" class="link-btn neutral" id="link_banner_change">Change</button>
+  </div>
   <div class="example" id="try_example" hidden>
     <p>New here? See how it works in 10 seconds.</p>
     <button type="button" id="try_example_btn" class="example-btn">Try an example quote</button>
@@ -99,8 +116,6 @@
       </div>
       <label for="b_address">Address</label>
       <textarea id="b_address" rows="2" maxlength="300"></textarea>
-      <label for="b_vat">VAT number (if registered)</label>
-      <input id="b_vat" maxlength="30">
 
       <label for="f_note">Trust line on every quote (optional)</label>
       <input id="f_note" maxlength="120" placeholder="e.g. Verified on Electricians Ranked">
@@ -110,6 +125,57 @@
         <div><label for="f_rating">Rating (out of 5)</label><input id="f_rating" type="number" inputmode="decimal" min="0" max="5" step="0.1"></div>
         <div><label for="f_reviews">Number of reviews</label><input id="f_reviews" type="number" inputmode="numeric" min="0" step="1"></div>
       </div>
+    </details>
+  </section>
+
+  <section>
+    <details id="taxcard">
+      <summary>Country and tax <span class="summary-line" id="tax_summary"></span></summary>
+      <label for="t_country">Country</label>
+      <select id="t_country"></select>
+      <div id="t_province_wrap" hidden>
+        <label for="t_province">Province or territory</label>
+        <select id="t_province"></select>
+        <p class="hint">Check with your accountant if you're unsure.</p>
+      </div>
+      <fieldset class="radio-group">
+        <legend id="t_reg_legend">Are you registered for VAT?</legend>
+        <label class="radio"><input type="radio" name="t_registered" id="t_reg_yes" value="1"> <span id="t_reg_yes_text">Yes, I charge VAT</span></label>
+        <label class="radio"><input type="radio" name="t_registered" id="t_reg_no" value="0"> No, I don't charge tax</label>
+      </fieldset>
+      <div id="t_regno_wrap">
+        <label for="b_vat" id="t_regno_label">VAT number</label>
+        <input id="b_vat" maxlength="30">
+      </div>
+      <div id="t_lines_wrap">
+        <div class="row">
+          <div><label for="t1_label">Tax name</label><input id="t1_label" maxlength="20"></div>
+          <div><label for="t1_rate">Rate (%)</label><input id="t1_rate" type="number" inputmode="decimal" min="0" max="30" step="any"></div>
+        </div>
+        <div class="row" id="t2_wrap" hidden>
+          <div><label for="t2_label">Second tax name</label><input id="t2_label" maxlength="20"></div>
+          <div><label for="t2_rate">Rate (%)</label><input id="t2_rate" type="number" inputmode="decimal" min="0" max="30" step="any"></div>
+        </div>
+        <button type="button" class="link-btn neutral" id="t2_toggle" hidden>+ Add second tax</button>
+        <label class="check" id="t_inclusive_wrap"><input type="checkbox" id="t_inclusive"> Prices include tax</label>
+        <p class="hint" id="t_inclusive_hint">On = the prices you type already include tax.</p>
+        <label class="check" id="t_labour_wrap" hidden><input type="checkbox" id="t_labour"> Labour isn't taxed</label>
+      </div>
+      <div id="t_note_wrap" hidden>
+        <label for="t_note">Note on the quote</label>
+        <input id="t_note" maxlength="60">
+      </div>
+      <details id="t_more">
+        <summary style="font-size:15px">More</summary>
+        <div class="row">
+          <div><label for="t_title">Document title</label>
+            <select id="t_title"><option>Quote</option><option>Quotation</option><option>Estimate</option></select></div>
+          <div><label for="t_paper">Paper</label>
+            <select id="t_paper"><option value="a4">A4</option><option value="letter">Letter</option></select></div>
+        </div>
+        <label for="t_currency">Currency symbol</label>
+        <input id="t_currency" maxlength="4" style="max-width:120px">
+      </details>
     </details>
   </section>
 
@@ -131,7 +197,8 @@
     <h2>Prices</h2>
     <div id="items"></div>
     <button type="button" id="add" style="margin-top:12px">+ Add item</button>
-    <label class="check"><input type="checkbox" id="vat"> Add VAT (20%)</label>
+    <label class="check" id="vat_wrap"><input type="checkbox" id="vat"> <span id="vat_label">Add VAT (20%)</span></label>
+    <p class="hint" id="untaxed_hint" hidden></p>
   </section>
 
   <section>
@@ -153,13 +220,7 @@
     <textarea id="q_notes" rows="3" maxlength="2000"></textarea>
   </section>
 
-  <section class="totals" aria-live="polite">
-    <div class="muted" id="t_lab_row" hidden><span>Labour</span><span id="t_lab"></span></div>
-    <div class="muted" id="t_mat_row" hidden><span>Materials</span><span id="t_mat"></span></div>
-    <div><span>Subtotal</span><span id="t_sub">£0.00</span></div>
-    <div id="t_vat_row" hidden><span>VAT (20%)</span><span id="t_vat">£0.00</span></div>
-    <div class="grand"><span>Total</span><span id="t_total">£0.00</span></div>
-  </section>
+  <section class="totals" id="totals" aria-live="polite"></section>
 </main>
 
 <div class="bar">
@@ -183,6 +244,10 @@
     set(k, v) { try { localStorage.setItem(k, v); return true; } catch { return false; } },
     del(k) { try { localStorage.removeItem(k); } catch {} },
   };
+  // Anyone who used the app before country settings existed is a UK user:
+  // never switch them silently. Only brand-new visitors get detection.
+  const LEGACY_KEYS = ["qm_b_name", "qm_vat", "qm_draft", "qm_next", "qm_logo", "qm_notes", "qm_prefix"];
+  const existingUser = LEGACY_KEYS.some((k) => store.get(k) !== null);
   const SETTINGS = ["b_name", "b_phone", "b_email", "b_address", "b_vat", "f_note", "f_link", "f_rating", "f_reviews"];
   const DEFAULT_NOTES = "Price includes the labour and materials listed. Any extra work will be agreed with you before it starts.";
   const MAX_PHOTOS = 3;
@@ -190,7 +255,7 @@
   // ---------- money: integer pence, half-up, mirrors the server ----------
   const toHundredths = (x) => Math.round(x * 100 + 1e-9);
   const lineTotal = (qh, up) => Math.floor((qh * up + 50) / 100);
-  const money = (p) => "£" + (p / 100).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const money = (p) => TAX.currency + (p / 100).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   // ---------- characters the PDF fonts can print (WinAnsi + folded Latin Ext-A) ----------
   const EXTRA = new Set([..."€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ"]);
@@ -211,9 +276,190 @@
     $(id).addEventListener("input", () => store.set("qm_" + id, $(id).value));
   }
   if ($("b_name").value.trim()) $("biz").open = false;
-  $("vat").checked = store.get("qm_vat") === "1";
+  // Per-quote tax toggle: existing users keep their old choice (VAT only if
+  // they ticked it); brand-new visitors start with it on.
+  const defaultApplyTax = () => {
+    const v = store.get("qm_vat");
+    return v === null ? !existingUser : v === "1";
+  };
+  $("vat").checked = defaultApplyTax();
   $("q_notes").value = store.get("qm_notes") ?? DEFAULT_NOTES;
   $("q_notes").addEventListener("input", () => { if (!exampleActive) store.set("qm_notes", $("q_notes").value); });
+
+  // ---------- country and tax ----------
+  // Presets are starting points the trade can change. Nothing here looks up
+  // rates; they are common standard rates as of Nov 2026, so check with an
+  // accountant. Business settings, saved on this device.
+  const COUNTRIES = {
+    GB: { name: "United Kingdom", currency: "£", lines: [["VAT", 20]], inclusive: false, reg: "VAT", regField: "VAT number", regPdf: "VAT no.", title: "Quote", paper: "a4", locale: "en-GB" },
+    IE: { name: "Ireland", currency: "€", lines: [["VAT", 23]], inclusive: true, reg: "VAT", regField: "VAT number", regPdf: "VAT no.", title: "Quotation", paper: "a4", locale: "en-IE" },
+    AU: { name: "Australia", currency: "$", lines: [["GST", 10]], inclusive: true, reg: "GST", regField: "ABN", regPdf: "ABN", title: "Quote", paper: "a4", locale: "en-AU", alwaysShowReg: true },
+    NZ: { name: "New Zealand", currency: "$", lines: [["GST", 15]], inclusive: true, reg: "GST", regField: "GST number", regPdf: "GST no.", title: "Quote", paper: "a4", locale: "en-NZ" },
+    CA: { name: "Canada", currency: "$", lines: null, inclusive: false, reg: "GST/HST", regField: "GST/HST number", regPdf: "GST/HST no.", title: "Estimate", paper: "letter", locale: "en-CA", second: true },
+    US: { name: "United States", currency: "$", lines: [["Sales tax", 0]], inclusive: false, reg: "sales tax", regField: "Licence number (optional)", regPdf: "Licence no.", title: "Estimate", paper: "letter", locale: "en-US", labourUntaxed: true, alwaysShowReg: true },
+    ZA: { name: "South Africa", currency: "R", lines: [["VAT", 15]], inclusive: true, reg: "VAT", regField: "VAT number", regPdf: "VAT no.", title: "Quotation", paper: "a4", locale: "en-ZA" },
+    CUSTOM: { name: "Other country", currency: "$", lines: [["Tax", 0]], inclusive: false, reg: "tax", regField: "Tax number", regPdf: "Tax no.", title: "Quote", paper: "a4", locale: "en-GB", second: true, labourOption: true },
+  };
+  const PROVINCES = {
+    AB: ["Alberta", [["GST", 5]]], BC: ["British Columbia", [["GST", 5], ["PST", 7]]], MB: ["Manitoba", [["GST", 5], ["RST", 7]]],
+    NB: ["New Brunswick", [["HST", 15]]], NL: ["Newfoundland and Labrador", [["HST", 15]]], NS: ["Nova Scotia", [["HST", 14]]],
+    NT: ["Northwest Territories", [["GST", 5]]], NU: ["Nunavut", [["GST", 5]]], ON: ["Ontario", [["HST", 13]]],
+    PE: ["Prince Edward Island", [["HST", 15]]], QC: ["Quebec", [["GST", 5], ["QST", 9.975]]], SK: ["Saskatchewan", [["GST", 5], ["PST", 6]]],
+    YT: ["Yukon", [["GST", 5]]],
+  };
+  const truthy = (v) => ["1", "true", "yes", "on"].includes(String(v).trim().toLowerCase());
+  const validRate = (v) => { const n = parseFloat(v); return Number.isFinite(n) && n >= 0 && n <= 30 ? Math.round(n * 1000) / 1000 : null; };
+  function fromPreset(country, province) {
+    const code = COUNTRIES[country] ? country : "GB";
+    const c = COUNTRIES[code];
+    const prov = code === "CA" ? (PROVINCES[province] ? province : "ON") : "";
+    const lines = (code === "CA" ? PROVINCES[prov][1] : c.lines).map(([label, rate]) => ({ label, rate }));
+    return { country: code, province: prov, registered: true, lines, inclusive: c.inclusive && lines.length === 1,
+             labourUntaxed: !!c.labourUntaxed, note: `No ${code === "US" ? "sales tax" : lines[0].label} charged`,
+             title: c.title, paper: c.paper, currency: c.currency, customised: false };
+  }
+  function sanitizeTax(t) {
+    if (!t || typeof t !== "object" || !COUNTRIES[t.country]) return null;
+    const lines = Array.isArray(t.lines) ? t.lines.slice(0, 2)
+      .map((l) => ({ label: String(l.label || "").trim().slice(0, 20), rate: validRate(l.rate) }))
+      .filter((l) => l.label && l.rate !== null) : [];
+    return { country: t.country, province: PROVINCES[t.province] ? t.province : "", registered: t.registered !== false,
+             lines, inclusive: !!t.inclusive && lines.length === 1, labourUntaxed: !!t.labourUntaxed,
+             note: String(t.note || "").slice(0, 60), title: ["Quote", "Quotation", "Estimate"].includes(t.title) ? t.title : "Quote",
+             paper: t.paper === "letter" ? "letter" : "a4", currency: String(t.currency || "£").slice(0, 4), customised: !!t.customised };
+  }
+  function detectCountry() {
+    const region = ((navigator.language || "").split("-")[1] || "").toUpperCase();
+    const code = region === "UK" ? "GB" : region;
+    return COUNTRIES[code] && code !== "CUSTOM" ? code : "GB";
+  }
+  let savedTax = null;
+  try { savedTax = sanitizeTax(JSON.parse(store.get("qm_tax") || "null")); } catch {}
+  let TAX = savedTax || fromPreset(existingUser ? "GB" : detectCountry());
+  let taxFromLink = false; // a link's settings apply to this visit only
+
+  const taxLinesText = (t) => t.lines.map((l) => `${l.label} ${l.rate}%`).join(" + ");
+  function taxApplies() { return TAX.registered && TAX.lines.length > 0 && $("vat").checked; }
+  function saveTax() { if (!taxFromLink) store.set("qm_tax", JSON.stringify(TAX)); }
+
+  function renderTaxForm() {
+    const c = COUNTRIES[TAX.country];
+    if (!$("t_country").options.length) {
+      for (const [code, v] of Object.entries(COUNTRIES)) $("t_country").add(new Option(v.name, code));
+      for (const [code, [name]] of Object.entries(PROVINCES)) $("t_province").add(new Option(name, code));
+    }
+    $("t_country").value = TAX.country;
+    $("t_province_wrap").hidden = TAX.country !== "CA";
+    if (TAX.country === "CA") $("t_province").value = TAX.province || "ON";
+    const regWord = TAX.lines[0]?.label && TAX.country !== "US" ? TAX.lines[0].label : c.reg;
+    $("t_reg_legend").textContent = TAX.country === "US" ? "Do you charge sales tax?" : `Are you registered for ${regWord}?`;
+    $("t_reg_yes_text").textContent = `Yes, I charge ${regWord}`;
+    $("t_reg_yes").checked = TAX.registered; $("t_reg_no").checked = !TAX.registered;
+    $("t_regno_label").textContent = c.regField;
+    $("t_regno_wrap").hidden = !TAX.registered && !c.alwaysShowReg;
+    $("t_lines_wrap").hidden = !TAX.registered;
+    $("t_note_wrap").hidden = TAX.registered;
+    $("t_note").value = TAX.note;
+    $("t1_label").value = TAX.lines[0]?.label || ""; $("t1_rate").value = TAX.lines[0]?.rate ?? "";
+    const two = TAX.lines.length > 1;
+    $("t2_wrap").hidden = !two;
+    $("t2_label").value = TAX.lines[1]?.label || ""; $("t2_rate").value = TAX.lines[1]?.rate ?? "";
+    $("t2_toggle").hidden = !c.second;
+    $("t2_toggle").textContent = two ? "Remove second tax" : "+ Add second tax";
+    $("t_inclusive").checked = TAX.inclusive; $("t_inclusive").disabled = two;
+    $("t_inclusive_hint").textContent = two ? "Not available with two taxes." : "On = the prices you type already include tax.";
+    $("t_labour_wrap").hidden = !(TAX.country === "US" || c.labourOption);
+    $("t_labour").checked = TAX.labourUntaxed;
+    $("t_title").value = TAX.title; $("t_paper").value = TAX.paper; $("t_currency").value = TAX.currency;
+    const how = !TAX.registered ? "not registered" : TAX.lines.length ? `${taxLinesText(TAX)} ${TAX.inclusive ? "included in prices" : "added on top"}` : "no tax";
+    $("tax_summary").textContent = `${c.name} · ${TAX.currency} · ${how}${TAX.customised ? " · customised" : ""}`;
+    // Quote-level toggle, labelled from the settings.
+    $("vat_wrap").hidden = !TAX.registered || !TAX.lines.length;
+    const only = TAX.lines.length === 1;
+    $("vat_label").textContent = TAX.inclusive && only ? `Prices include ${TAX.lines[0].label} (${TAX.lines[0].rate}%)`
+      : only ? `Add ${TAX.lines[0].label} (${TAX.lines[0].rate}%)` : `Add ${taxLinesText(TAX)}`;
+    $("untaxed_hint").hidden = TAX.registered;
+    $("untaxed_hint").textContent = TAX.note ? `Quotes will say “${TAX.note}”.` : "";
+    for (const l of document.querySelectorAll(".price-label")) l.textContent = `Price each (${TAX.currency})`;
+  }
+
+  function readTaxForm(changedId) {
+    if (changedId === "t_country" || changedId === "t_province") {
+      TAX = fromPreset($("t_country").value, $("t_province").value);
+    } else {
+      const lines = [];
+      const r1 = validRate($("t1_rate").value), r2 = validRate($("t2_rate").value);
+      const twoShown = !$("t2_wrap").hidden;
+      if (($("t1_label").value.trim() && r1 === null) || (twoShown && $("t2_label").value.trim() && r2 === null)) {
+        say("Tax rates must be between 0% and 30%.");
+        renderTaxForm(); // put the last good values back
+        return;
+      }
+      if ($("t1_label").value.trim() && r1 !== null) lines.push({ label: $("t1_label").value.trim().slice(0, 20), rate: r1 });
+      if (!$("t2_wrap").hidden && $("t2_label").value.trim() && r2 !== null) lines.push({ label: $("t2_label").value.trim().slice(0, 20), rate: r2 });
+      const preset = fromPreset(TAX.country, TAX.province);
+      const cur = $("t_currency").value.trim();
+      TAX = { ...TAX, registered: $("t_reg_yes").checked, lines, inclusive: $("t_inclusive").checked && lines.length === 1,
+              labourUntaxed: $("t_labour").checked, note: $("t_note").value.slice(0, 60), title: $("t_title").value,
+              paper: $("t_paper").value, currency: cur && !/\d/.test(cur) ? cur.slice(0, 4) : TAX.currency };
+      TAX.customised = JSON.stringify(lines) !== JSON.stringify(preset.lines) || TAX.inclusive !== preset.inclusive;
+    }
+    taxFromLink = false; // editing makes them the trade's own settings
+    $("link_banner").hidden = true;
+    saveTax();
+    renderTaxForm();
+    changed();
+  }
+  for (const id of ["t_country", "t_province", "t1_label", "t1_rate", "t2_label", "t2_rate", "t_inclusive", "t_labour", "t_note", "t_title", "t_paper", "t_currency", "t_reg_yes", "t_reg_no"]) {
+    $(id).addEventListener("change", () => readTaxForm(id));
+  }
+  $("t2_toggle").addEventListener("click", () => {
+    $("t2_wrap").hidden = !$("t2_wrap").hidden;
+    if ($("t2_wrap").hidden) { $("t2_label").value = ""; $("t2_rate").value = ""; }
+    else if (!$("t2_label").value) { $("t2_label").value = "PST"; $("t2_rate").value = "7"; }
+    readTaxForm("t2_toggle");
+  });
+  $("taxcard").addEventListener("toggle", () => { if ($("taxcard").open) store.set("qm_tax_seen", "1"); recalc(); });
+  $("link_banner_change").addEventListener("click", () => { $("taxcard").open = true; $("taxcard").scrollIntoView({ behavior: "smooth" }); });
+  // First visit outside the UK: show the settings so they can be checked.
+  if (!savedTax && TAX.country !== "GB") $("taxcard").open = true;
+
+  // Link parameters (e.g. ?country=AU&tax_rate=10) set tax for this visit only.
+  const TAX_KEYS = ["country", "province", "tax_label", "tax_rate", "tax2_label", "tax2_rate", "tax_inclusive", "registered", "currency", "title", "paper", "labour_taxable"];
+  const CURRENCY_CODES = { GBP: "£", EUR: "€", USD: "$", AUD: "$", NZD: "$", CAD: "$", ZAR: "R" };
+  function applyTaxParams(p) {
+    if (!TAX_KEYS.some((k) => p.has(k))) return;
+    const country = (p.get("country") || "").trim().toUpperCase();
+    const t = COUNTRIES[country === "UK" ? "GB" : country]
+      ? fromPreset(country === "UK" ? "GB" : country, (p.get("province") || "").trim().toUpperCase())
+      : { ...TAX, lines: TAX.lines.map((l) => ({ ...l })) };
+    const label = (k) => (p.get(k) || "").trim().slice(0, 20);
+    if (p.has("tax_label") || p.has("tax_rate")) {
+      const r = validRate(p.get("tax_rate"));
+      t.lines[0] = { label: label("tax_label") || t.lines[0]?.label || "Tax", rate: r ?? t.lines[0]?.rate ?? 0 };
+    }
+    if (p.has("tax2_label") || p.has("tax2_rate")) {
+      const r = validRate(p.get("tax2_rate"));
+      if (r !== null && t.lines.length) t.lines[1] = { label: label("tax2_label") || "Tax 2", rate: r };
+    }
+    if (p.has("tax_inclusive")) t.inclusive = truthy(p.get("tax_inclusive"));
+    if (t.lines.length !== 1) t.inclusive = false;
+    if (p.has("registered")) t.registered = truthy(p.get("registered"));
+    if (p.has("labour_taxable")) t.labourUntaxed = !truthy(p.get("labour_taxable"));
+    const cur = (p.get("currency") || "").trim();
+    if (CURRENCY_CODES[cur.toUpperCase()]) t.currency = CURRENCY_CODES[cur.toUpperCase()];
+    else if (cur && cur.length <= 4 && !/\d/.test(cur)) t.currency = cur;
+    const title = (p.get("title") || "").trim().toLowerCase();
+    const titles = { quote: "Quote", quotation: "Quotation", estimate: "Estimate" };
+    if (titles[title]) t.title = titles[title];
+    const paper = (p.get("paper") || "").trim().toLowerCase();
+    if (paper === "a4" || paper === "letter") t.paper = paper;
+    TAX = t;
+    taxFromLink = true;
+    $("vat").checked = TAX.registered && TAX.lines.length > 0;
+    $("link_banner_text").textContent = `Settings set by this link: ${COUNTRIES[TAX.country].name}, ${TAX.registered && TAX.lines.length ? taxLinesText(TAX) : "no tax"}.`;
+    $("link_banner").hidden = false;
+  }
 
   // ---------- images: downscale on the device before upload ----------
   async function toJpeg(file, maxSide, quality) {
@@ -377,7 +623,7 @@
     $("f_link").value = normalizeLink($("f_link").value);
     store.set("qm_f_link", $("f_link").value);
   });
-  const fmtDate = (d) => d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  const fmtDate = (d) => d.toLocaleDateString((COUNTRIES[TAX.country] || COUNTRIES.GB).locale, { day: "numeric", month: "short", year: "numeric" });
 
   // ---------- line items (built with DOM APIs, never innerHTML) ----------
   function field(labelText, el) {
@@ -406,7 +652,9 @@
     k.value = it.kind || "";
     const nums = document.createElement("div");
     nums.className = "item-nums";
-    nums.append(field("Qty", q), field("Price each (£)", p), field("Type", k));
+    const priceField = field(`Price each (${TAX.currency})`, p);
+    priceField.firstChild.className = "price-label";
+    nums.append(field("Qty", q), priceField, field("Type", k));
     const foot = document.createElement("div");
     foot.className = "item-foot";
     const rm = document.createElement("button");
@@ -419,7 +667,15 @@
     });
     const total = document.createElement("span");
     total.className = "item-total";
-    foot.append(rm, total);
+    row.dataset.taxable = it.taxable === false ? "0" : "1";
+    const tx = document.createElement("button");
+    tx.type = "button"; tx.className = "tax-link";
+    tx.addEventListener("click", () => {
+      row.dataset.taxable = row.dataset.taxable === "0" ? "1" : "0";
+      editedAfterSend(null);
+      changed();
+    });
+    foot.append(rm, tx, total);
     row.append(field("Description", d), nums, foot);
     $("items").append(row);
   }
@@ -431,7 +687,22 @@
       quantity: parseFloat(row.querySelector(".qty").value),
       unit_price: parseFloat(row.querySelector(".price").value),
       kind: row.querySelector(".kind").value,
+      taxable: rowTaxable(row),
     }));
+  }
+
+  function currentTotal() {
+    const el = document.querySelector("#totals .grand span:last-child, #totals .grand-incl span:last-child");
+    return el ? el.textContent : "";
+  }
+
+  function rowTaxable(row) {
+    return row.dataset.taxable !== "0" && !(TAX.labourUntaxed && row.querySelector(".kind").value === "labour");
+  }
+  // value * num / den, rounded half-up, without float error (BigInt).
+  function mulDiv(value, num, den) {
+    const v = BigInt(value), n = BigInt(num), d = BigInt(den);
+    return Number((v * n * 2n + d) / (2n * d));
   }
 
   function recalc() {
@@ -447,13 +718,53 @@
       if (kind === "labour") lab += t;
       if (kind === "materials") mat += t;
     }
-    const vat = $("vat").checked ? Math.floor((sub * 20 + 50) / 100) : 0;
-    $("t_lab_row").hidden = !lab; $("t_lab").textContent = money(lab);
-    $("t_mat_row").hidden = !mat; $("t_mat").textContent = money(mat);
-    $("t_sub").textContent = money(sub);
-    $("t_vat").textContent = money(vat);
-    $("t_vat_row").hidden = !$("vat").checked;
-    $("t_total").textContent = money(sub + vat);
+    // Tax, mirroring the server: once on the whole taxable amount.
+    const apply = taxApplies();
+    let taxable = 0;
+    const showLinks = apply && (store.get("qm_tax_seen") === "1" || TAX.country !== "GB" || TAX.labourUntaxed);
+    for (const row of $("items").children) {
+      const qty = parseFloat(row.querySelector(".qty").value), price = parseFloat(row.querySelector(".price").value);
+      const t = qty > 0 && price >= 0 ? lineTotal(toHundredths(qty), toHundredths(price)) : 0;
+      const isTaxable = rowTaxable(row);
+      if (isTaxable) taxable += t;
+      const link = row.querySelector(".tax-link");
+      const autoLabour = TAX.labourUntaxed && row.querySelector(".kind").value === "labour";
+      link.hidden = !showLinks;
+      link.disabled = autoLabour;
+      link.textContent = autoLabour ? "Not taxed (labour)" : isTaxable ? "Taxable" : "Not taxed";
+      link.classList.toggle("off", !isTaxable);
+    }
+    const rows = [];
+    if (lab) rows.push(["Labour", money(lab), "muted"]);
+    if (mat) rows.push(["Materials", money(mat), "muted"]);
+    let total = sub;
+    if (apply && TAX.inclusive) {
+      const l = TAX.lines[0], milli = Math.round(l.rate * 1000);
+      const gst = taxable - mulDiv(taxable, 100000, 100000 + milli);
+      rows.push([`Total (incl. ${l.label})`, money(total), "grand-incl"]);
+      rows.push([`Includes ${l.label} of ${money(gst)}`, "", "note"]);
+    } else if (apply) {
+      rows.push(["Subtotal", money(sub), ""]);
+      if (taxable !== sub) rows.push(["Taxable amount", money(taxable), "muted"]);
+      for (const l of TAX.lines) {
+        const amount = mulDiv(taxable, Math.round(l.rate * 1000), 100000);
+        total += amount;
+        rows.push([`${l.label} (${l.rate}%)`, money(amount), ""]);
+      }
+      rows.push(["Total", money(total), "grand"]);
+    } else {
+      rows.push(["Total", money(total), "grand"]);
+      if (TAX.note) rows.push([TAX.note, "", "note"]);
+    }
+    const box = $("totals");
+    box.replaceChildren(...rows.map(([label, value, cls]) => {
+      const div = document.createElement("div");
+      if (cls) div.className = cls;
+      const a = document.createElement("span"); a.textContent = label;
+      const b = document.createElement("span"); b.textContent = value;
+      div.append(a, b);
+      return div;
+    }));
   }
 
   // ---------- draft: survives reloads and tab eviction ----------
@@ -466,6 +777,7 @@
         quantity: row.querySelector(".qty").value,
         unit_price: row.querySelector(".price").value,
         kind: row.querySelector(".kind").value,
+        taxable: row.dataset.taxable !== "0",
       })),
       quote_number: $("q_number").value,
       date: $("q_date").value,
@@ -473,6 +785,8 @@
       notes: $("q_notes").value,
       sent: sentNumber,
       example: exampleActive,
+      link_tax: taxFromLink ? TAX : null,
+      apply_tax: $("vat").checked,
       link_logo: linkLogo ? logo : null,
     }));
   }
@@ -496,7 +810,7 @@
     if (exampleActive) {
       // Leaving the example: put the trade's own saved details back.
       for (const id of SETTINGS) $(id).value = store.get("qm_" + id) ?? "";
-      $("vat").checked = store.get("qm_vat") === "1";
+      $("vat").checked = defaultApplyTax();
       $("try_example").hidden = !!(store.get("qm_b_name") || "").trim();
     }
     $("c_name").value = ""; $("c_address").value = ""; $("q_scope").value = "";
@@ -515,7 +829,7 @@
   // Prefer the #fragment: it is never sent to the server, so customer details
   // stay out of server and proxy logs. ?query works too. Either way the
   // personal fields are removed from the address bar; utm_* tags are kept.
-  const PREFILL_KEYS = ["customer_name", "customer_address", "job", "notes", "quote_number", "vat", "item", "demo", "logo"];
+  const QUOTE_KEYS = ["customer_name", "customer_address", "job", "notes", "quote_number", "vat", "item", "demo", "logo"];
 
   // ---------- example quote (#demo link or the "Try an example" button) ----------
   // Fills the whole form with a made-up business and job so a visitor can
@@ -523,7 +837,7 @@
   // it is never written to this device's saved settings.
   const EXAMPLE = {
     business: { b_name: "Sparks Electrical (example)", b_phone: "0117 496 0000", b_email: "hello@sparks-electrical.example",
-                b_address: "1 Example Street\nBristol BS1 0AA", b_vat: "GB000000000",
+                b_address: "1 Example Street\nBristol BS1 0AA", b_vat: "",
                 f_note: "Verified on Electricians Ranked (example)", f_link: "", f_rating: "4.9", f_reviews: "37" },
     customer_name: "Mrs Jones", customer_address: "2 Low Road\nBristol BS2 0XX",
     job: "Replace the old fuse board with an 18th Edition RCBO consumer unit, test every circuit and issue an Electrical Installation Certificate. Work notified under Part P.",
@@ -537,6 +851,7 @@
     startFresh();
     exampleActive = true;
     for (const [id, v] of Object.entries(EXAMPLE.business)) $(id).value = v; // no input event: not saved
+    if (TAX.country === "GB") $("b_vat").value = "GB000000000";
     $("c_name").value = EXAMPLE.customer_name;
     $("c_address").value = EXAMPLE.customer_address;
     $("q_scope").value = EXAMPLE.job;
@@ -554,7 +869,8 @@
   function readPrefill() {
     const hash = new URLSearchParams(location.hash.slice(1));
     const query = new URLSearchParams(location.search);
-    const has = (p) => PREFILL_KEYS.some((k) => p.has(k));
+    const keys = [...QUOTE_KEYS, ...TAX_KEYS];
+    const has = (p) => keys.some((k) => p.has(k));
     const source = has(hash) ? hash : has(query) ? query : null;
     if (!source) return null;
     const keep = new URLSearchParams();
@@ -604,7 +920,21 @@
   let draft = null;
   try { draft = JSON.parse(store.get("qm_draft") || "null"); } catch {}
   const prefill = readPrefill();
-  if (prefill) {
+  if (prefill) applyTaxParams(prefill);
+  const linkTax = !taxFromLink && draft && !(prefill && QUOTE_KEYS.some((k) => prefill.has(k)))
+    ? sanitizeTax(draft.link_tax) : null;
+  if (draft && typeof draft.apply_tax === "boolean" && !(prefill && TAX_KEYS.some((k) => prefill.has(k)))) {
+    $("vat").checked = draft.apply_tax;
+  }
+  if (linkTax) {
+    TAX = linkTax;
+    taxFromLink = true;
+    $("link_banner_text").textContent = `Settings set by this link: ${COUNTRIES[TAX.country].name}, ${TAX.registered && TAX.lines.length ? taxLinesText(TAX) : "no tax"}.`;
+    $("link_banner").hidden = false;
+  }
+  renderTaxForm();
+  const quoteLink = prefill && QUOTE_KEYS.some((k) => prefill.has(k));
+  if (quoteLink) {
     applyPrefill(prefill);
   } else if (draft && Array.isArray(draft.items)) {
     $("c_name").value = draft.customer?.name || "";
@@ -636,7 +966,7 @@
     changed();
   });
   $("vat").addEventListener("change", () => { store.set("qm_vat", $("vat").checked ? "1" : "0"); changed(); });
-  if (!prefill && !(store.get("qm_b_name") || "").trim() && !$("c_name").value.trim()) $("try_example").hidden = false;
+  if (!quoteLink && !(store.get("qm_b_name") || "").trim() && !$("c_name").value.trim()) $("try_example").hidden = false;
 
   let armed = null;
   $("new_quote").addEventListener("click", () => {
@@ -647,6 +977,14 @@
     }
     clearTimeout(armed); armed = null;
     $("new_quote").textContent = "New quote";
+    if (taxFromLink) {
+      // A link's settings were for that quote; go back to the trade's own.
+      TAX = savedTax || fromPreset(existingUser ? "GB" : detectCountry());
+      taxFromLink = false;
+      $("link_banner").hidden = true;
+      $("vat").checked = defaultApplyTax();
+      renderTaxForm();
+    }
     startFresh();
     say("New quote started.", "ok");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -661,14 +999,23 @@
     const reviews = parseInt($("f_reviews").value, 10);
     return {
       business: { name: $("b_name").value, phone: $("b_phone").value, email: $("b_email").value,
-                  address: $("b_address").value, vat_number: $("b_vat").value },
+                  address: $("b_address").value,
+                  vat_number: TAX.registered || COUNTRIES[TAX.country].alwaysShowReg ? $("b_vat").value : "" },
       customer: { name: $("c_name").value, address: $("c_address").value },
       quote_number: $("q_number").value,
       date: fmtDate(date),
       valid_until: fmtDate(until),
       scope: $("q_scope").value,
       items: readItems(),
-      vat: $("vat").checked,
+      tax: {
+        lines: taxApplies() ? TAX.lines.map((l) => ({ label: l.label, rate: l.rate })) : [],
+        inclusive: taxApplies() && TAX.inclusive,
+        untaxed_note: taxApplies() ? "" : TAX.note,
+      },
+      currency: TAX.currency,
+      paper: TAX.paper,
+      title: TAX.title,
+      reg_label: COUNTRIES[TAX.country].regPdf,
       notes: $("q_notes").value,
       footer_note: $("f_note").value,
       footer_link: normalizeLink($("f_link").value),
@@ -709,7 +1056,8 @@
     const name = safe ? `quote-${safe}.pdf` : "quote.pdf";
     const texts = [body.business.name, body.business.address, body.customer.name, body.customer.address,
                    body.scope, body.notes, body.footer_note, ...body.items.map((i) => i.description),
-                   ...body.photos.map((p) => p.caption)];
+                   ...body.photos.map((p) => p.caption), body.currency, body.title,
+                   ...body.tax.lines.map((l) => l.label), body.tax.untaxed_note];
     return { blob: await res.blob(), name, body, missing: unprintable(texts) };
   }
 
@@ -735,7 +1083,7 @@
     busy = true; $("fallback").hidden = true; say("Making your PDF…", "ok");
     try {
       const { blob, name, body, missing } = await buildPdf();
-      const total = $("t_total").textContent;
+      const total = currentTotal();
       const note = missing.length ? ` Note: ${missing.join(" ")} can't be printed and shows as "?".` : "";
       const file = new File([blob], name, { type: "application/pdf" });
       let shared = false;

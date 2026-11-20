@@ -1,12 +1,12 @@
 //! Lays a validated [`Quote`] out onto A4 pages.
 
-use crate::pdf::{self, fit_line, text_width, wrap, Font, Jpeg, Page, PAGE_HEIGHT, PAGE_WIDTH};
-use crate::quote::{format_money, format_quantity, Quote, VAT_RATE_PERCENT};
+use crate::pdf::{self, fit_line, text_width, wrap, Font, Jpeg, Page, PAGE_WIDTH};
+use crate::quote::{format_money_in, format_quantity, Quote};
+use crate::tax::rate_text;
 
 const MARGIN: f32 = 50.0;
 const RIGHT: f32 = PAGE_WIDTH - MARGIN;
 const CONTENT_WIDTH: f32 = RIGHT - MARGIN;
-const TOP: f32 = PAGE_HEIGHT - MARGIN;
 const BOTTOM: f32 = 70.0; // leave room for the footer
 const DESC_WIDTH: f32 = 270.0;
 const QTY_RIGHT: f32 = 375.0;
@@ -17,7 +17,6 @@ const MUTED: f32 = 0.4;
 /// Darker grey for secondary figures that must stay readable (≥7:1).
 const SECONDARY: f32 = 0.3;
 const HEADER_FILL: f32 = 0.15;
-const TITLE: &str = "QUOTE";
 const TITLE_SIZE: f32 = 20.0;
 const NAME_SIZE: f32 = 20.0;
 const META_LABEL_GAP: f32 = 12.0;
@@ -29,13 +28,17 @@ const MAX_CONTACT_LINES: usize = 10;
 struct Layout {
     pages: Vec<Page>,
     y: f32,
+    /// First baseline on a page; depends on the paper height.
+    top: f32,
 }
 
 impl Layout {
-    fn new() -> Self {
+    fn new(paper: pdf::Paper) -> Self {
+        let top = paper.size().1 - MARGIN;
         Layout {
             pages: vec![Page::default()],
-            y: TOP,
+            y: top,
+            top,
         }
     }
 
@@ -47,7 +50,7 @@ impl Layout {
     fn ensure(&mut self, height: f32) -> bool {
         if self.y - height < BOTTOM {
             self.pages.push(Page::default());
-            self.y = TOP;
+            self.y = self.top;
             true
         } else {
             false
@@ -98,7 +101,7 @@ pub(crate) fn meta_label_right(value: &str) -> f32 {
 /// Width available to the business name/contact column: up to 300pt, but
 /// always clear of the widest label/value pair (and the QUOTE title).
 pub(crate) fn header_left_width(q: &Quote) -> f32 {
-    let mut meta_left = RIGHT - text_width(TITLE, Font::Bold, TITLE_SIZE);
+    let mut meta_left = RIGHT - text_width(&title_text(q), Font::Bold, TITLE_SIZE);
     for (label, value) in [
         ("Quote no.", &q.quote_number),
         ("Date", &q.date),
@@ -110,6 +113,11 @@ pub(crate) fn header_left_width(q: &Quote) -> f32 {
         }
     }
     (meta_left - MARGIN - 16.0).clamp(120.0, 300.0)
+}
+
+/// The document title as printed, e.g. "QUOTE" or "ESTIMATE".
+pub(crate) fn title_text(q: &Quote) -> String {
+    q.title.to_uppercase()
 }
 
 /// Lines of the "To accept this quote" box: (text, bold).
@@ -133,7 +141,11 @@ pub(crate) fn accept_lines(q: &Quote) -> Vec<(String, bool)> {
     }
     if !q.valid_until.is_empty() {
         lines.push((
-            format!("This quote is valid until {}.", q.valid_until),
+            format!(
+                "This {} is valid until {}.",
+                q.title.to_lowercase(),
+                q.valid_until
+            ),
             false,
         ));
     }
@@ -166,7 +178,7 @@ fn accept_block(l: &mut Layout, q: &Quote) {
         Font::Bold,
         9.0,
         0.0,
-        "TO ACCEPT THIS QUOTE",
+        &format!("TO ACCEPT THIS {}", title_text(q)),
     );
     y -= 16.0;
     for (text, bold) in lines {
@@ -199,7 +211,8 @@ pub(crate) fn footer_text(q: &Quote) -> String {
 }
 
 pub fn render_quote(q: &Quote) -> Vec<u8> {
-    let mut l = Layout::new();
+    let mut l = Layout::new(q.paper);
+    let money = |pence: i64| format_money_in(&q.currency, pence);
     let mut images: Vec<Jpeg> = Vec::new();
 
     // Header: logo + business on the left, QUOTE block on the right. The left
@@ -234,7 +247,7 @@ pub fn render_quote(q: &Quote) -> Vec<u8> {
         }
     }
     if !q.business.vat_number.is_empty() {
-        contact.push(format!("VAT no. {}", q.business.vat_number));
+        contact.push(format!("{} {}", q.reg_label, q.business.vat_number));
     }
     for line in contact
         .iter()
@@ -248,7 +261,7 @@ pub fn render_quote(q: &Quote) -> Vec<u8> {
 
     let mut right_y = header_top - 8.0;
     l.page()
-        .text_right(RIGHT, right_y, Font::Bold, TITLE_SIZE, 0.4, TITLE);
+        .text_right(RIGHT, right_y, Font::Bold, TITLE_SIZE, 0.4, &title_text(q));
     right_y -= 20.0;
     for (label, value) in [
         ("Quote no.", &q.quote_number),
@@ -341,7 +354,7 @@ pub fn render_quote(q: &Quote) -> Vec<u8> {
                     Font::Regular,
                     BODY,
                     0.0,
-                    &format_money(item.unit_pence),
+                    &money(item.unit_pence),
                 );
                 page.text_right(
                     RIGHT - 6.0,
@@ -349,10 +362,19 @@ pub fn render_quote(q: &Quote) -> Vec<u8> {
                     Font::Regular,
                     BODY,
                     0.0,
-                    &format_money(item.total_pence),
+                    &money(item.total_pence),
                 );
             }
             l.y -= LEADING;
+        }
+        if !item.taxable && !q.taxes.is_empty() {
+            if l.ensure(LEADING) {
+                l.table_header();
+            }
+            let y = l.y + 2.0;
+            l.page()
+                .text(MARGIN + 6.0, y, Font::Regular, 8.0, SECONDARY, "Not taxed");
+            l.y -= 11.0;
         }
         l.y -= 4.0;
         let y = l.y + 8.0;
@@ -360,56 +382,96 @@ pub fn render_quote(q: &Quote) -> Vec<u8> {
         l.y -= 6.0;
     }
 
-    // Totals.
-    let mut rows: Vec<(String, String, bool, bool)> = Vec::new(); // label, value, strong, secondary
+    // Totals: the rows follow the tax setup (see the designer spec in the
+    // README): exclusive tax lines, an inclusive "Total (incl. GST)", or no tax.
+    enum Row {
+        Line(String, String, f32),
+        Total(String, String, f32),
+        Note(String),
+    }
+    let mut rows: Vec<Row> = Vec::new();
     if q.totals.labour > 0 {
-        rows.push(("Labour".into(), format_money(q.totals.labour), false, true));
+        rows.push(Row::Line(
+            "Labour".into(),
+            money(q.totals.labour),
+            SECONDARY,
+        ));
     }
     if q.totals.materials > 0 {
-        rows.push((
+        rows.push(Row::Line(
             "Materials".into(),
-            format_money(q.totals.materials),
-            false,
-            true,
+            money(q.totals.materials),
+            SECONDARY,
         ));
     }
-    rows.push((
-        "Subtotal".into(),
-        format_money(q.totals.subtotal),
-        false,
-        false,
-    ));
-    if q.vat {
-        rows.push((
-            format!("VAT ({VAT_RATE_PERCENT}%)"),
-            format_money(q.totals.vat),
-            false,
-            false,
-        ));
-    } else {
-        rows.push(("VAT".into(), "Not charged".into(), false, false));
+    match q.taxes.first() {
+        Some(t) if q.tax.inclusive => {
+            rows.push(Row::Total(
+                format!("Total (incl. {})", t.label),
+                money(q.totals.total),
+                16.0,
+            ));
+            rows.push(Row::Note(format!(
+                "Includes {} of {}",
+                t.label,
+                money(t.amount)
+            )));
+        }
+        Some(_) => {
+            rows.push(Row::Line("Subtotal".into(), money(q.totals.subtotal), 0.0));
+            if q.totals.taxable != q.totals.subtotal {
+                rows.push(Row::Line(
+                    "Taxable amount".into(),
+                    money(q.totals.taxable),
+                    SECONDARY,
+                ));
+            }
+            for t in &q.taxes {
+                rows.push(Row::Line(
+                    format!("{} ({}%)", t.label, rate_text(t.milli)),
+                    money(t.amount),
+                    0.0,
+                ));
+            }
+            rows.push(Row::Total("Total".into(), money(q.totals.total), 14.0));
+        }
+        None => {
+            rows.push(Row::Total("Total".into(), money(q.totals.total), 14.0));
+            if !q.tax.untaxed_note.is_empty() {
+                rows.push(Row::Note(q.tax.untaxed_note.clone()));
+            }
+        }
     }
-    rows.push(("Total".into(), format_money(q.totals.total), true, false));
     l.ensure(rows.len() as f32 * 18.0 + 40.0);
     l.y -= 4.0;
-    for (label, value, strong, secondary) in rows {
-        let gray = if secondary { SECONDARY } else { 0.0 };
-        if strong {
-            l.y -= 6.0;
-            let y = l.y;
-            let box_left = UNIT_RIGHT - 90.0;
-            l.page()
-                .fill_rect(box_left, y - 9.0, RIGHT - box_left, 28.0, 0.93);
-            let page = l.page();
-            page.text_right(UNIT_RIGHT, y, Font::Bold, 14.0, 0.0, &label);
-            page.text_right(RIGHT - 6.0, y, Font::Bold, 14.0, 0.0, &value);
-            l.y -= 26.0;
-        } else {
-            let y = l.y;
-            let page = l.page();
-            page.text_right(UNIT_RIGHT, y, Font::Regular, BODY, gray, &label);
-            page.text_right(RIGHT - 6.0, y, Font::Regular, BODY, gray, &value);
-            l.y -= 16.0;
+    for row in rows {
+        match row {
+            Row::Line(label, value, gray) => {
+                let y = l.y;
+                let page = l.page();
+                page.text_right(UNIT_RIGHT, y, Font::Regular, BODY, gray, &label);
+                page.text_right(RIGHT - 6.0, y, Font::Regular, BODY, gray, &value);
+                l.y -= 16.0;
+            }
+            Row::Total(label, value, size) => {
+                l.y -= 6.0;
+                let y = l.y;
+                let label_w = text_width(&label, Font::Bold, size);
+                let box_left = (UNIT_RIGHT - 90.0).min(UNIT_RIGHT - label_w - 12.0);
+                let height = size + 14.0;
+                l.page()
+                    .fill_rect(box_left, y - 9.0, RIGHT - box_left, height, 0.93);
+                let page = l.page();
+                page.text_right(UNIT_RIGHT, y, Font::Bold, size, 0.0, &label);
+                page.text_right(RIGHT - 6.0, y, Font::Bold, size, 0.0, &value);
+                l.y -= height - 2.0;
+            }
+            Row::Note(text) => {
+                let y = l.y;
+                l.page()
+                    .text_right(RIGHT - 6.0, y, Font::Regular, 9.0, SECONDARY, &text);
+                l.y -= 14.0;
+            }
         }
     }
 
@@ -468,7 +530,7 @@ pub fn render_quote(q: &Quote) -> Vec<u8> {
         }
     }
 
-    pdf::write_pdf(&l.pages, &images)
+    pdf::write_pdf(&l.pages, &images, q.paper)
 }
 
 #[cfg(test)]
@@ -506,9 +568,15 @@ mod tests {
                     } else {
                         String::new()
                     },
+                    taxable: true,
                 })
                 .collect(),
             vat: true,
+            tax: None,
+            currency: String::new(),
+            paper: String::new(),
+            title: String::new(),
+            reg_label: String::new(),
             notes: notes.into(),
             footer_note: "Verified on Electricians Ranked".into(),
             footer_link: String::new(),
@@ -655,7 +723,7 @@ mod tests {
         let mut r = sample(1, "");
         r.vat = false;
         let pdf = render_quote(&validate(r).unwrap());
-        assert_eq!(count(&pdf, hex("Not charged").as_bytes()), 1);
+        assert_eq!(count(&pdf, hex("No VAT charged").as_bytes()), 1);
     }
 
     #[test]
@@ -707,5 +775,130 @@ mod photo_heading_tests {
                 "orphaned heading with {n} items"
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod country_tests {
+    use super::*;
+    use crate::quote::tests::{item, request};
+    use crate::quote::{validate, LineItem, QuoteRequest};
+    use crate::tax::{TaxInput, TaxLineInput};
+
+    fn hex(s: &str) -> String {
+        s.chars()
+            .map(|c| format!("{:02X}", crate::pdf::win_ansi(c)))
+            .collect()
+    }
+    fn has(pdf: &[u8], text: &str) -> bool {
+        let h = hex(text);
+        String::from_utf8_lossy(pdf).contains(&h)
+    }
+    fn tax(lines: &[(&str, f64)], inclusive: bool, note: &str) -> Option<TaxInput> {
+        Some(TaxInput {
+            lines: lines
+                .iter()
+                .map(|(l, r)| TaxLineInput {
+                    label: (*l).into(),
+                    rate: *r,
+                })
+                .collect(),
+            inclusive,
+            untaxed_note: note.into(),
+        })
+    }
+    fn labour(desc: &str, qty: f64, price: f64) -> LineItem {
+        let mut i = item(desc, qty, price);
+        i.kind = "labour".into();
+        i
+    }
+    fn render(r: QuoteRequest) -> Vec<u8> {
+        render_quote(&validate(r).unwrap())
+    }
+
+    #[test]
+    fn australia_inclusive_total_is_prominent() {
+        let mut r = request(vec![item("Switchboard upgrade", 1.0, 1100.0)], false);
+        r.tax = tax(&[("GST", 10.0)], true, "");
+        r.currency = "$".into();
+        r.reg_label = "ABN".into();
+        r.business.vat_number = "12 345 678 901".into();
+        let q = validate(r.clone()).unwrap();
+        assert_eq!((q.totals.total, q.totals.tax), (110_000, 10_000));
+        let pdf = render(r);
+        assert!(has(&pdf, "Total (incl. GST)"));
+        assert!(has(&pdf, "Includes GST of $100.00"));
+        assert!(has(&pdf, "$1,100.00"));
+        assert!(has(&pdf, "ABN 12 345 678 901"));
+        assert!(!has(&pdf, "Subtotal"));
+    }
+
+    #[test]
+    fn canada_two_tax_lines_letter_estimate() {
+        let mut r = request(vec![item("Panel upgrade", 1.0, 1000.0)], false);
+        r.tax = tax(&[("GST", 5.0), ("PST", 7.0)], false, "");
+        r.currency = "$".into();
+        r.title = "Estimate".into();
+        r.paper = "letter".into();
+        let pdf = render(r);
+        for t in [
+            "Subtotal",
+            "GST (5%)",
+            "PST (7%)",
+            "$1,120.00",
+            "TO ACCEPT THIS ESTIMATE",
+            "This estimate is valid",
+        ] {
+            assert!(has(&pdf, t), "{t}");
+        }
+        assert!(String::from_utf8_lossy(&pdf).contains("/MediaBox [0 0 612 792]"));
+    }
+
+    #[test]
+    fn us_untaxed_labour_shows_taxable_amount() {
+        let mut r = request(
+            vec![item("Materials", 1.0, 500.0), labour("Labour", 1.0, 300.0)],
+            false,
+        );
+        r.items[1].taxable = false;
+        r.tax = tax(&[("Sales tax", 8.875)], false, "");
+        r.currency = "$".into();
+        let q = validate(r.clone()).unwrap();
+        assert_eq!(
+            (q.totals.taxable, q.totals.tax, q.totals.total),
+            (50_000, 4_438, 84_438)
+        );
+        let pdf = render(r);
+        for t in [
+            "Taxable amount",
+            "Sales tax (8.875%)",
+            "Not taxed",
+            "$844.38",
+        ] {
+            assert!(has(&pdf, t), "{t}");
+        }
+    }
+
+    #[test]
+    fn unregistered_trade_shows_note_only() {
+        let mut r = request(vec![item("Job", 1.0, 100.0)], false);
+        r.tax = tax(&[], false, "No GST charged");
+        let pdf = render(r);
+        assert!(has(&pdf, "No GST charged"));
+        assert!(!has(&pdf, "Subtotal"));
+        assert!(!has(&pdf, "Not taxed")); // markers only when tax applies
+    }
+
+    #[test]
+    fn rejects_bad_locale_fields() {
+        let mut r = request(vec![item("x", 1.0, 1.0)], false);
+        r.paper = "a3".into();
+        assert!(validate(r).unwrap_err().contains("Paper"));
+        let mut r = request(vec![item("x", 1.0, 1.0)], false);
+        r.currency = "12345".into();
+        assert!(validate(r).unwrap_err().contains("Currency"));
+        let mut r = request(vec![item("x", 1.0, 1.0)], false);
+        r.title = "x".repeat(21);
+        assert!(validate(r).unwrap_err().contains("title"));
     }
 }
