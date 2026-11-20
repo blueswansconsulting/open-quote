@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Runs local CI before every push. Enable once per clone with:
+#   git config core.hooksPath .githooks
+# Skip Docker for a faster push: SKIP_DOCKER=1 git push
+exec "$(git rev-parse --show-toplevel)/scripts/ci.sh"

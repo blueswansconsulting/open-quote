@@ -1,0 +1,59 @@
+{
+ "business": {
+  "name": "Hillside Roofing (example)",
+  "phone": "01632 960123",
+  "email": "hello@hillside-roofing.example",
+  "address": "Unit 4, Example Trading Estate\nSalisbury SP1 0AA",
+  "vat_number": "GB000000000"
+ },
+ "customer": {
+  "name": "Mr & Mrs Example",
+  "address": "12 Sample Close\nSalisbury SP2 0XX"
+ },
+ "quote_number": "HR-0142",
+ "date": "20 Nov 2026",
+ "valid_until": "20 Dec 2026",
+ "scope": "Storm damage repair to the rear pitched roof. Erect scaffold to the rear elevation, strip and replace slipped and broken concrete tiles (approx. 4 m²), renew the lead flashing at the chimney abutment, re-bed and point the ridge, and clear the gutters on completion. All waste removed from site.",
+ "items": [
+  {
+   "description": "Scaffold to rear elevation (erect, 2 weeks hire, dismantle)",
+   "quantity": 1,
+   "unit_price": 650,
+   "kind": "materials"
+  },
+  {
+   "description": "Concrete interlocking tiles to match existing",
+   "quantity": 40,
+   "unit_price": 3.2,
+   "kind": "materials"
+  },
+  {
+   "description": "Code 4 lead flashing and sundries",
+   "quantity": 1,
+   "unit_price": 185,
+   "kind": "materials"
+  },
+  {
+   "description": "Ridge re-bed and point (per linear metre)",
+   "quantity": 8,
+   "unit_price": 38,
+   "kind": "labour"
+  },
+  {
+   "description": "Roofing labour: strip, re-tile and flash (2 roofers, per day)",
+   "quantity": 2,
+   "unit_price": 480,
+   "kind": "labour"
+  },
+  {
+   "description": "Gutter clear and waste removal",
+   "quantity": 1,
+   "unit_price": 95
+  }
+ ],
+ "vat": true,
+ "notes": "Fully insured. Any further damage found once the roof is opened will be photographed and agreed with you before work continues. Payment due on completion.",
+ "footer_note": "Verified on Roofers Ranked (example)",
+ "rating": 4.8,
+ "review_count": 52
+}

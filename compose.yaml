@@ -1,0 +1,11 @@
+services:
+  open-quote:
+    build: .
+    image: open-quote:local
+    # Once released: image: ghcr.io/blueswansconsulting/open-quote:0.1
+    ports:
+      - "127.0.0.1:8790:8790"   # put a TLS reverse proxy in front for phones
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]

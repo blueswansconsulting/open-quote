@@ -1,0 +1,75 @@
+name: CI
+
+# Checks run locally via scripts/ci.sh (and the .githooks/pre-push hook).
+# This workflow is manual-only so it doesn't spend Actions minutes; run it
+# from the Actions tab when hosted runners are available.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    name: fmt, clippy, test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - run: cargo fmt --all --check
+      - run: cargo clippy --all-targets --locked -- -D warnings
+      - run: cargo test --locked
+
+  msrv:
+    name: MSRV (1.87)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+        with:
+          toolchain: "1.87"
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - run: cargo test --locked
+
+  deny:
+    name: cargo-deny (advisories, licences)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: EmbarkStudios/cargo-deny-action@17aeb3c839e42274e2b8adf721c8c65edfdc74dd # v2.1.3
+
+  docker:
+    name: Docker build + healthcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: docker build -t open-quote:ci .
+      - name: Smoke test
+        run: |
+          docker run -d --name oq -p 8790:8790 open-quote:ci
+          for i in $(seq 1 20); do curl -fsS http://127.0.0.1:8790/healthz && break; sleep 1; done
+          curl -fsS -o /tmp/q.pdf -H 'content-type: application/json' \
+            --data '{"business":{"name":"CI"},"customer":{"name":"Test"},"items":[{"description":"x","quantity":1,"unit_price":1}]}' \
+            http://127.0.0.1:8790/api/quote.pdf
+          head -c 8 /tmp/q.pdf | grep -q '%PDF-1.4'
+          docker exec oq /usr/local/bin/open-quote healthcheck
+          docker rm -f oq

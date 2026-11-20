@@ -1,0 +1,65 @@
+{
+ "business": {
+  "name": "Brightside Solar (example)",
+  "phone": "0117 496 0123",
+  "email": "quotes@brightside-solar.example",
+  "address": "8 Example Street\nBristol BS1 0AA",
+  "vat_number": "GB000000000"
+ },
+ "customer": {
+  "name": "Ms A. Example",
+  "address": "3 Sample Road\nBristol BS9 0XX"
+ },
+ "quote_number": "BS-0027",
+ "date": "20 Nov 2026",
+ "valid_until": "20 Dec 2026",
+ "scope": "Supply and install a 4.4 kWp solar PV system (10 x 440 W panels) on the south-facing roof, with a 5 kWh battery and hybrid inverter in the garage. Includes scaffold, DNO notification, commissioning and the MCS certificate needed for Smart Export Guarantee payments.",
+ "items": [
+  {
+   "description": "440 W all-black solar panels",
+   "quantity": 10,
+   "unit_price": 165,
+   "kind": "materials"
+  },
+  {
+   "description": "5 kW hybrid inverter",
+   "quantity": 1,
+   "unit_price": 1150,
+   "kind": "materials"
+  },
+  {
+   "description": "5 kWh battery storage",
+   "quantity": 1,
+   "unit_price": 1950,
+   "kind": "materials"
+  },
+  {
+   "description": "Mounting kit, isolators, cabling and generation meter",
+   "quantity": 1,
+   "unit_price": 520,
+   "kind": "materials"
+  },
+  {
+   "description": "Scaffold (erect, hire and dismantle)",
+   "quantity": 1,
+   "unit_price": 550,
+   "kind": "materials"
+  },
+  {
+   "description": "Installation: 2 installers + electrician (per day)",
+   "quantity": 2,
+   "unit_price": 690,
+   "kind": "labour"
+  },
+  {
+   "description": "DNO notification, commissioning and MCS certificate",
+   "quantity": 1,
+   "unit_price": 250,
+   "kind": "labour"
+  }
+ ],
+ "vat": false,
+ "notes": "0% VAT: installing solar panels and batteries in a home is zero-rated in Great Britain until 31 March 2027 (HMRC energy-saving materials relief), so no VAT is added. Estimated generation is about 3,700 kWh a year; actual output depends on shading and weather. 25% deposit on acceptance, balance on commissioning.",
+ "footer_note": "Listed on Solar Installer List",
+ "footer_link": "https://solarinstallerlist.com/"
+}

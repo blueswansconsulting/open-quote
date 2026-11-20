@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1f6feb">
+<title>Open Quote</title>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #fff; --ink: #16181d; --muted: #5f6672; --line: #dfe2e7;
+    --accent: #1f6feb; --accent-ink: #fff; --danger: #c62828; --warn: #8a5a00;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0f1115; --card: #181b21; --ink: #eceef2; --muted: #9aa3af; --line: #2a2f38;
+            --accent: #4c8dff; --accent-ink: #fff; --danger: #ff6b6b; --warn: #f0b429; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 16px 16px 190px; }
+  h1 { font-size: 22px; margin: 8px 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 16px; font-size: 14px; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+            padding: 14px; margin-bottom: 12px; }
+  h2 { font-size: 15px; margin: 0 0 10px; }
+  summary { font-weight: 600; font-size: 15px; cursor: pointer; }
+  details[open] summary { margin-bottom: 10px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 8px 0 4px; }
+  .hint { font-size: 12px; color: var(--muted); margin: 4px 0 0; }
+  input, textarea, select { width: 100%; font: inherit; color: var(--ink); background: var(--bg);
+                    border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+  textarea { resize: vertical; min-height: 44px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .item { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 10px; }
+  .item:first-child { border-top: 0; margin-top: 0; padding-top: 0; }
+  .item-nums { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; align-items: end; }
+  .item-foot { display: flex; justify-content: space-between; align-items: center; }
+  .item-total { font-variant-numeric: tabular-nums; font-weight: 600; }
+  button { font: inherit; border-radius: 8px; border: 1px solid var(--line); padding: 10px 14px;
+           background: var(--card); color: var(--ink); cursor: pointer; }
+  .link-btn { color: var(--danger); border-color: transparent; background: none; padding: 4px 0; font-size: 14px; }
+  .check { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+  .check input { width: auto; }
+  .totals { font-variant-numeric: tabular-nums; }
+  .totals div { display: flex; justify-content: space-between; padding: 3px 0; }
+  .totals .muted { color: var(--muted); font-size: 14px; }
+  .totals .grand { font-weight: 700; font-size: 18px; border-top: 1px solid var(--line); margin-top: 6px; padding-top: 8px; }
+  .thumbs { display: grid; gap: 10px; margin-top: 10px; }
+  .thumb { display: grid; grid-template-columns: 72px 1fr auto; gap: 10px; align-items: center; }
+  .thumb img { width: 72px; height: 72px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); }
+  .logo-row { display: flex; gap: 12px; align-items: center; }
+  .logo-row img { max-height: 48px; max-width: 140px; border-radius: 4px; background: #fff; }
+  .bar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--card); border-top: 1px solid var(--line);
+         padding: 10px 16px calc(12px + env(safe-area-inset-bottom)); }
+  .bar-inner { max-width: 640px; margin: 0 auto; display: grid; grid-template-columns: auto 1fr 1fr; gap: 8px; }
+  .primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+  #msg { max-width: 640px; margin: 0 auto 8px; color: var(--danger); font-size: 14px; }
+  #msg.ok { color: var(--muted); }
+  #msg.warn { color: var(--warn); }
+  #fallback { max-width: 640px; margin: 0 auto 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  #fallback a { text-align: center; text-decoration: none; color: var(--ink); border: 1px solid var(--line);
+                border-radius: 8px; padding: 8px; font-size: 14px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Open Quote</h1>
+  <p class="sub">Make a quote and send it as a PDF. Your details and your current draft are saved on this device only.</p>
+
+  <section>
+    <details id="biz" open>
+      <summary>Your business</summary>
+      <label for="logo_file">Logo</label>
+      <div class="logo-row">
+        <img id="logo_preview" alt="Your logo" hidden>
+        <input id="logo_file" type="file" accept="image/*">
+        <button type="button" id="logo_remove" class="link-btn" hidden>Remove</button>
+      </div>
+      <label for="b_name">Business name *</label>
+      <input id="b_name" autocomplete="organization" maxlength="100">
+      <div class="row">
+        <div><label for="b_phone">Phone</label><input id="b_phone" type="tel" autocomplete="tel" maxlength="40"></div>
+        <div><label for="b_email">Email</label><input id="b_email" type="email" autocomplete="email" maxlength="100"></div>
+      </div>
+      <label for="b_address">Address</label>
+      <textarea id="b_address" rows="2" maxlength="300"></textarea>
+      <label for="b_vat">VAT number (if registered)</label>
+      <input id="b_vat" maxlength="30">
+
+      <label for="f_note">Trust line on every quote (optional)</label>
+      <input id="f_note" maxlength="120" placeholder="e.g. Verified on Electricians Ranked">
+      <label for="f_link">Link to your listing or reviews</label>
+      <input id="f_link" type="url" inputmode="url" maxlength="300" placeholder="https://">
+      <div class="row">
+        <div><label for="f_rating">Rating (out of 5)</label><input id="f_rating" type="number" inputmode="decimal" min="0" max="5" step="0.1"></div>
+        <div><label for="f_reviews">Number of reviews</label><input id="f_reviews" type="number" inputmode="numeric" min="0" step="1"></div>
+      </div>
+    </details>
+  </section>
+
+  <section>
+    <h2>Customer</h2>
+    <label for="c_name">Name *</label>
+    <input id="c_name" maxlength="100">
+    <label for="c_address">Address</label>
+    <textarea id="c_address" rows="2" maxlength="300"></textarea>
+  </section>
+
+  <section>
+    <h2>The work</h2>
+    <label for="q_scope">Describe the job</label>
+    <textarea id="q_scope" rows="4" maxlength="5000" placeholder="e.g. Replace the consumer unit, test all circuits and issue an Electrical Installation Certificate."></textarea>
+  </section>
+
+  <section>
+    <h2>Prices</h2>
+    <div id="items"></div>
+    <button type="button" id="add" style="margin-top:12px">+ Add item</button>
+    <label class="check"><input type="checkbox" id="vat"> Add VAT (20%)</label>
+  </section>
+
+  <section>
+    <h2>Photos</h2>
+    <input id="photo_file" type="file" accept="image/*" multiple>
+    <p class="hint">Up to 3. Photos stay on this page only and aren't saved with your draft.</p>
+    <div id="thumbs" class="thumbs"></div>
+  </section>
+
+  <section>
+    <h2>Quote details</h2>
+    <div class="row">
+      <div><label for="q_number">Quote number</label><input id="q_number" maxlength="30"></div>
+      <div><label for="q_date">Date</label><input id="q_date" type="date"></div>
+    </div>
+    <label for="q_days">Valid for (days)</label>
+    <input id="q_days" type="number" inputmode="numeric" min="1" max="365" value="30">
+    <label for="q_notes">Notes and terms</label>
+    <textarea id="q_notes" rows="3" maxlength="2000"></textarea>
+  </section>
+
+  <section class="totals" aria-live="polite">
+    <div class="muted" id="t_lab_row" hidden><span>Labour</span><span id="t_lab"></span></div>
+    <div class="muted" id="t_mat_row" hidden><span>Materials</span><span id="t_mat"></span></div>
+    <div><span>Subtotal</span><span id="t_sub">£0.00</span></div>
+    <div id="t_vat_row" hidden><span>VAT (20%)</span><span id="t_vat">£0.00</span></div>
+    <div class="grand"><span>Total</span><span id="t_total">£0.00</span></div>
+  </section>
+</main>
+
+<div class="bar">
+  <div id="msg" role="status"></div>
+  <div id="fallback" hidden>
+    <a id="wa_link" target="_blank" rel="noopener">Open WhatsApp</a>
+    <a id="mail_link">Open email</a>
+  </div>
+  <div class="bar-inner">
+    <button type="button" id="new_quote">New quote</button>
+    <button type="button" id="download">Download PDF</button>
+    <button type="button" id="share" class="primary">Send quote</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); return true; } catch { return false; } },
+    del(k) { try { localStorage.removeItem(k); } catch {} },
+  };
+  const SETTINGS = ["b_name", "b_phone", "b_email", "b_address", "b_vat", "f_note", "f_link", "f_rating", "f_reviews"];
+  const DEFAULT_NOTES = "Price includes the labour and materials listed. Any extra work will be agreed with you before it starts.";
+  const MAX_PHOTOS = 3;
+
+  // ---------- money: integer pence, half-up, mirrors the server ----------
+  const toHundredths = (x) => Math.round(x * 100 + 1e-9);
+  const lineTotal = (qh, up) => Math.floor((qh * up + 50) / 100);
+  const money = (p) => "£" + (p / 100).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  // ---------- characters the PDF fonts can print (WinAnsi + folded Latin Ext-A) ----------
+  const EXTRA = new Set([..."€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ"]);
+  const printable = (c) => {
+    const n = c.codePointAt(0);
+    return c === "\n" || c === "\t" || (n >= 0x20 && n <= 0x7e) || (n >= 0xa0 && n <= 0x17f) || EXTRA.has(c);
+  };
+  function unprintable(texts) {
+    const bad = new Set();
+    for (const t of texts) for (const c of t) if (!printable(c)) bad.add(c);
+    return [...bad];
+  }
+
+  // ---------- settings persist on this device ----------
+  for (const id of SETTINGS) {
+    const saved = store.get("qm_" + id);
+    if (saved !== null) $(id).value = saved;
+    $(id).addEventListener("input", () => store.set("qm_" + id, $(id).value));
+  }
+  if ($("b_name").value.trim()) $("biz").open = false;
+  $("vat").checked = store.get("qm_vat") === "1";
+  $("q_notes").value = store.get("qm_notes") ?? DEFAULT_NOTES;
+  $("q_notes").addEventListener("input", () => store.set("qm_notes", $("q_notes").value));
+
+  // ---------- images: downscale on the device before upload ----------
+  async function toJpeg(file, maxSide, quality) {
+    let source, w, h;
+    if (window.createImageBitmap) {
+      source = await createImageBitmap(file);
+      w = source.width; h = source.height;
+    } else {
+      source = await new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error("That file isn't an image we can read."));
+        img.src = URL.createObjectURL(file);
+      });
+      w = source.naturalWidth; h = source.naturalHeight;
+    }
+    const scale = Math.min(1, maxSide / Math.max(w, h));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(w * scale));
+    canvas.height = Math.max(1, Math.round(h * scale));
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#fff"; // flatten transparent logos onto white
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/jpeg", quality);
+  }
+  const dataUrlBytes = (u) => Math.floor((u.length - u.indexOf(",") - 1) * 3 / 4);
+
+  let logo = store.get("qm_logo") || "";
+  function showLogo() {
+    $("logo_preview").hidden = !logo;
+    $("logo_remove").hidden = !logo;
+    if (logo) $("logo_preview").src = logo;
+  }
+  $("logo_file").addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      let url = await toJpeg(file, 600, 0.85);
+      if (dataUrlBytes(url) > 280 * 1024) url = await toJpeg(file, 400, 0.7);
+      logo = url;
+      if (!store.set("qm_logo", logo)) say("Logo added, but this browser won't save it for next time.", "warn");
+      showLogo();
+    } catch {
+      say("Couldn't read that image. Try a JPEG or PNG.");
+    }
+  });
+  $("logo_remove").addEventListener("click", () => { logo = ""; store.del("qm_logo"); showLogo(); });
+  showLogo();
+
+  let photos = []; // { data, caption } kept in memory only
+  function renderPhotos() {
+    const box = $("thumbs");
+    box.replaceChildren();
+    photos.forEach((p, i) => {
+      const row = document.createElement("div");
+      row.className = "thumb";
+      const img = document.createElement("img");
+      img.src = p.data; img.alt = `Photo ${i + 1}`;
+      const cap = document.createElement("input");
+      cap.placeholder = "Caption (optional)"; cap.maxLength = 200; cap.value = p.caption;
+      cap.addEventListener("input", () => { p.caption = cap.value; });
+      const rm = document.createElement("button");
+      rm.type = "button"; rm.className = "link-btn"; rm.textContent = "Remove";
+      rm.addEventListener("click", () => { photos.splice(i, 1); renderPhotos(); });
+      row.append(img, cap, rm);
+      box.append(row);
+    });
+    $("photo_file").disabled = photos.length >= MAX_PHOTOS;
+  }
+  $("photo_file").addEventListener("change", async (e) => {
+    const files = [...e.target.files];
+    e.target.value = "";
+    const room = MAX_PHOTOS - photos.length;
+    if (files.length > room) say(`Only ${MAX_PHOTOS} photos fit on a quote. Added the first ${room}.`, "warn");
+    for (const file of files.slice(0, room)) {
+      try {
+        let data = await toJpeg(file, 1600, 0.8);
+        if (dataUrlBytes(data) > 950 * 1024) data = await toJpeg(file, 1200, 0.7);
+        photos.push({ data, caption: "" });
+      } catch {
+        say("Couldn't read one of those images. Try a JPEG or PNG.");
+      }
+    }
+    renderPhotos();
+  });
+
+  // ---------- quote numbers ----------
+  // Follows whatever format the trade uses: "Q-0007", "SE-12", "2026/041"...
+  const counter = () => parseInt(store.get("qm_next") || "1", 10) || 1;
+  const numPrefix = () => store.get("qm_prefix") ?? "Q-";
+  const numPad = () => parseInt(store.get("qm_pad") || "4", 10) || 4;
+  const nextNumber = () => numPrefix() + String(counter()).padStart(numPad(), "0");
+  function markUsed(used) {
+    const m = /^(.*?)(\d+)$/.exec(used.trim());
+    if (!m) return;
+    const n = parseInt(m[2], 10);
+    if (m[1] !== numPrefix()) {
+      store.set("qm_prefix", m[1]); store.set("qm_pad", String(m[2].length)); store.set("qm_next", String(n + 1));
+    } else if (n >= counter()) {
+      store.set("qm_next", String(n + 1));
+    }
+  }
+  // The number of the last quote sent from this draft. Editing the quote
+  // afterwards moves it to a fresh number, so two customers never share one.
+  let sentNumber = null;
+
+  // ---------- dates (local time, not UTC) ----------
+  const isoLocal = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const parseIso = (s) => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; };
+  const fmtDate = (d) => d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+
+  // ---------- line items (built with DOM APIs, never innerHTML) ----------
+  function field(labelText, el) {
+    const wrap = document.createElement("div");
+    const label = document.createElement("label");
+    label.textContent = labelText;
+    wrap.append(label, el);
+    return wrap;
+  }
+  function addItem(it = {}) {
+    const row = document.createElement("div");
+    row.className = "item";
+    const d = document.createElement("textarea");
+    d.rows = 2; d.maxLength = 2000; d.className = "desc"; d.value = it.description || "";
+    d.placeholder = "e.g. Supply and fit double socket";
+    const q = document.createElement("input");
+    q.type = "number"; q.inputMode = "decimal"; q.min = "0"; q.step = "any"; q.className = "qty"; q.value = it.quantity ?? "1";
+    const p = document.createElement("input");
+    p.type = "number"; p.inputMode = "decimal"; p.min = "0"; p.step = "0.01"; p.className = "price"; p.value = it.unit_price ?? "";
+    p.placeholder = "0.00";
+    const k = document.createElement("select");
+    k.className = "kind";
+    for (const [v, t] of [["", "—"], ["labour", "Labour"], ["materials", "Materials"]]) {
+      const o = document.createElement("option"); o.value = v; o.textContent = t; k.append(o);
+    }
+    k.value = it.kind || "";
+    const nums = document.createElement("div");
+    nums.className = "item-nums";
+    nums.append(field("Qty", q), field("Price each (£)", p), field("Type", k));
+    const foot = document.createElement("div");
+    foot.className = "item-foot";
+    const rm = document.createElement("button");
+    rm.type = "button"; rm.className = "link-btn"; rm.textContent = "Remove";
+    rm.addEventListener("click", () => {
+      row.remove();
+      if (!$("items").children.length) addItem();
+      changed();
+    });
+    const total = document.createElement("span");
+    total.className = "item-total";
+    foot.append(rm, total);
+    row.append(field("Description", d), nums, foot);
+    $("items").append(row);
+  }
+  $("add").addEventListener("click", () => { addItem(); changed(); $("items").lastChild.querySelector("textarea").focus(); });
+
+  function readItems() {
+    return [...$("items").children].map((row) => ({
+      description: row.querySelector(".desc").value.trim(),
+      quantity: parseFloat(row.querySelector(".qty").value),
+      unit_price: parseFloat(row.querySelector(".price").value),
+      kind: row.querySelector(".kind").value,
+    }));
+  }
+
+  function recalc() {
+    let sub = 0, lab = 0, mat = 0;
+    for (const row of $("items").children) {
+      const qty = parseFloat(row.querySelector(".qty").value);
+      const price = parseFloat(row.querySelector(".price").value);
+      const ok = qty > 0 && price >= 0;
+      const t = ok ? lineTotal(toHundredths(qty), toHundredths(price)) : 0;
+      row.querySelector(".item-total").textContent = ok ? money(t) : "";
+      sub += t;
+      const kind = row.querySelector(".kind").value;
+      if (kind === "labour") lab += t;
+      if (kind === "materials") mat += t;
+    }
+    const vat = $("vat").checked ? Math.floor((sub * 20 + 50) / 100) : 0;
+    $("t_lab_row").hidden = !lab; $("t_lab").textContent = money(lab);
+    $("t_mat_row").hidden = !mat; $("t_mat").textContent = money(mat);
+    $("t_sub").textContent = money(sub);
+    $("t_vat").textContent = money(vat);
+    $("t_vat_row").hidden = !$("vat").checked;
+    $("t_total").textContent = money(sub + vat);
+  }
+
+  // ---------- draft: survives reloads and tab eviction ----------
+  function saveDraft() {
+    store.set("qm_draft", JSON.stringify({
+      customer: { name: $("c_name").value, address: $("c_address").value },
+      scope: $("q_scope").value,
+      items: [...$("items").children].map((row) => ({
+        description: row.querySelector(".desc").value,
+        quantity: row.querySelector(".qty").value,
+        unit_price: row.querySelector(".price").value,
+        kind: row.querySelector(".kind").value,
+      })),
+      quote_number: $("q_number").value,
+      date: $("q_date").value,
+      days: $("q_days").value,
+      sent: sentNumber,
+    }));
+  }
+  function changed() { recalc(); saveDraft(); }
+
+  function startFresh() {
+    $("c_name").value = ""; $("c_address").value = ""; $("q_scope").value = "";
+    $("items").replaceChildren(); addItem();
+    photos = []; renderPhotos();
+    $("q_number").value = nextNumber();
+    $("q_date").value = isoLocal(new Date());
+    $("q_days").value = "30";
+    $("fallback").hidden = true;
+    sentNumber = null;
+    changed();
+  }
+
+  // ---------- prefill from a link (e.g. sent by a CRM) ----------
+  // Prefer the #fragment: it is never sent to the server, so customer details
+  // stay out of server and proxy logs. ?query works too. Either way the
+  // personal fields are removed from the address bar; utm_* tags are kept.
+  const PREFILL_KEYS = ["customer_name", "customer_address", "job", "notes", "quote_number", "vat", "item"];
+  function readPrefill() {
+    const hash = new URLSearchParams(location.hash.slice(1));
+    const query = new URLSearchParams(location.search);
+    const has = (p) => PREFILL_KEYS.some((k) => p.has(k));
+    const source = has(hash) ? hash : has(query) ? query : null;
+    if (!source) return null;
+    const keep = new URLSearchParams();
+    for (const [k, v] of query) if (k.startsWith("utm_")) keep.append(k, v);
+    const rest = keep.toString();
+    history.replaceState(null, "", location.pathname + (rest ? "?" + rest : ""));
+    return source;
+  }
+  function applyPrefill(p) {
+    startFresh();
+    const take = (k, max) => (p.get(k) || "").slice(0, max);
+    if (p.has("customer_name")) $("c_name").value = take("customer_name", 100);
+    if (p.has("customer_address")) $("c_address").value = take("customer_address", 300);
+    if (p.has("job")) $("q_scope").value = take("job", 5000);
+    if (p.has("notes")) $("q_notes").value = take("notes", 2000);
+    if (p.has("quote_number")) $("q_number").value = take("quote_number", 30);
+    if (p.has("vat")) {
+      $("vat").checked = ["1", "true", "yes"].includes(p.get("vat").toLowerCase());
+      store.set("qm_vat", $("vat").checked ? "1" : "0");
+    }
+    // item=description|quantity|unit price|labour or materials (repeatable)
+    const items = p.getAll("item").slice(0, 100).map((raw) => {
+      const [description = "", quantity = "1", unit_price = "", kind = ""] = raw.split("|");
+      const k = kind.trim().toLowerCase();
+      return {
+        description: description.slice(0, 2000),
+        quantity: quantity.trim() || "1",
+        unit_price: unit_price.trim(),
+        kind: k === "labour" || k === "materials" ? k : "",
+      };
+    });
+    if (items.length) {
+      $("items").replaceChildren();
+      items.forEach((it) => addItem(it));
+    }
+    changed();
+    say("Filled in from your link. Check the details, then send.", "ok");
+  }
+
+  let draft = null;
+  try { draft = JSON.parse(store.get("qm_draft") || "null"); } catch {}
+  const prefill = readPrefill();
+  if (prefill) {
+    applyPrefill(prefill);
+  } else if (draft && Array.isArray(draft.items)) {
+    $("c_name").value = draft.customer?.name || "";
+    $("c_address").value = draft.customer?.address || "";
+    $("q_scope").value = draft.scope || "";
+    draft.items.forEach((it) => addItem(it));
+    if (!draft.items.length) addItem();
+    $("q_number").value = draft.quote_number || nextNumber();
+    $("q_date").value = draft.date || isoLocal(new Date());
+    $("q_days").value = draft.days || "30";
+    sentNumber = typeof draft.sent === "string" ? draft.sent : null;
+    recalc();
+  } else {
+    startFresh();
+  }
+  document.querySelector("main").addEventListener("input", (e) => {
+    if (e.target.closest("#biz") || e.target.type === "file") return;
+    if (sentNumber !== null) {
+      if (e.target.id !== "q_number" && $("q_number").value === sentNumber) {
+        $("q_number").value = nextNumber();
+        say(`You've changed a quote you already sent, so this one is now ${$("q_number").value}. Change the number back if you're re-sending the same quote.`, "ok");
+      }
+      sentNumber = null;
+    }
+    changed();
+  });
+  $("vat").addEventListener("change", () => { store.set("qm_vat", $("vat").checked ? "1" : "0"); changed(); });
+
+  let armed = null;
+  $("new_quote").addEventListener("click", () => {
+    if (!armed) {
+      $("new_quote").textContent = "Tap to clear";
+      armed = setTimeout(() => { armed = null; $("new_quote").textContent = "New quote"; }, 3000);
+      return;
+    }
+    clearTimeout(armed); armed = null;
+    $("new_quote").textContent = "New quote";
+    startFresh();
+    say("New quote started.", "ok");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+
+  // ---------- build + send ----------
+  function payload() {
+    const date = parseIso($("q_date").value) || new Date();
+    const days = Math.min(365, Math.max(1, parseInt($("q_days").value, 10) || 30));
+    const until = new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
+    const rating = parseFloat($("f_rating").value);
+    const reviews = parseInt($("f_reviews").value, 10);
+    return {
+      business: { name: $("b_name").value, phone: $("b_phone").value, email: $("b_email").value,
+                  address: $("b_address").value, vat_number: $("b_vat").value },
+      customer: { name: $("c_name").value, address: $("c_address").value },
+      quote_number: $("q_number").value,
+      date: fmtDate(date),
+      valid_until: fmtDate(until),
+      scope: $("q_scope").value,
+      items: readItems(),
+      vat: $("vat").checked,
+      notes: $("q_notes").value,
+      footer_note: $("f_note").value,
+      footer_link: $("f_link").value.trim(),
+      rating: Number.isFinite(rating) ? rating : null,
+      review_count: Number.isFinite(reviews) && reviews >= 0 ? reviews : null,
+      logo,
+      photos: photos.map((p) => ({ data: p.data, caption: p.caption })),
+    };
+  }
+
+  function say(text, kind = "error") { $("msg").textContent = text; $("msg").className = kind === "error" ? "" : kind; }
+
+  async function buildPdf() {
+    const body = payload();
+    // Friendly checks before the round trip; the server validates again.
+    if (!body.business.name.trim()) { $("biz").open = true; $("b_name").focus(); throw new Error("Add your business name."); }
+    if (!body.customer.name.trim()) { $("c_name").focus(); throw new Error("Add the customer's name."); }
+    const bad = body.items.findIndex((i) => !i.description || !(i.quantity > 0) || !(i.unit_price >= 0));
+    if (bad >= 0) throw new Error(`Item ${bad + 1}: add a description, quantity and price.`);
+    if (body.footer_link && !/^https?:\/\/\S+$/.test(body.footer_link)) {
+      $("biz").open = true; $("f_link").focus(); throw new Error("The listing link must start with https://");
+    }
+
+    let res;
+    try {
+      res = await fetch("/api/quote.pdf", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+      });
+    } catch {
+      throw new Error("No connection. Check your signal and try again; your draft is saved.");
+    }
+    if (!res.ok) {
+      let msg = "Couldn't make the PDF. Please try again.";
+      try { msg = (await res.json()).error || msg; } catch {}
+      throw new Error(msg);
+    }
+    const safe = body.quote_number.replace(/[^A-Za-z0-9_-]/g, "").slice(0, 30);
+    const name = safe ? `quote-${safe}.pdf` : "quote.pdf";
+    const texts = [body.business.name, body.business.address, body.customer.name, body.customer.address,
+                   body.scope, body.notes, body.footer_note, ...body.items.map((i) => i.description),
+                   ...body.photos.map((p) => p.caption)];
+    return { blob: await res.blob(), name, body, missing: unprintable(texts) };
+  }
+
+  function download(blob, name) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = name;
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  }
+
+  function showFallback(body, total) {
+    const text = `Hi ${body.customer.name.trim()}, here's your quote ${body.quote_number} from ${body.business.name.trim()}. Total ${total}. The PDF is attached.`;
+    $("wa_link").href = "https://wa.me/?text=" + encodeURIComponent(text);
+    $("mail_link").href = "mailto:?subject=" + encodeURIComponent(`Quote ${body.quote_number} from ${body.business.name.trim()}`) +
+      "&body=" + encodeURIComponent(text);
+    $("fallback").hidden = false;
+  }
+
+  let busy = false;
+  async function run(mode) {
+    if (busy) return;
+    busy = true; $("fallback").hidden = true; say("Making your PDF…", "ok");
+    try {
+      const { blob, name, body, missing } = await buildPdf();
+      const total = $("t_total").textContent;
+      const note = missing.length ? ` Note: ${missing.join(" ")} can't be printed and shows as "?".` : "";
+      const file = new File([blob], name, { type: "application/pdf" });
+      let shared = false;
+      if (mode === "share" && navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          // Some browsers never settle the share promise; don't leave the app stuck.
+          await Promise.race([
+            navigator.share({ files: [file], title: `Quote ${body.quote_number}`,
+                              text: `Your quote from ${body.business.name.trim()}. Total ${total}.` }),
+            new Promise((_, reject) => setTimeout(() => reject(new Error("share timed out")), 120000)),
+          ]);
+          shared = true;
+        } catch (e) {
+          if (e.name === "AbortError") { say(""); return; }
+          // Any other share failure: fall through to download + manual send.
+        }
+      }
+      markUsed(body.quote_number);
+      sentNumber = body.quote_number;
+      saveDraft();
+      if (shared) {
+        say("Quote sent. Tap New quote for the next job." + note, missing.length ? "warn" : "ok");
+      } else {
+        download(blob, name);
+        if (mode === "share") {
+          showFallback(body, total);
+          const why = window.isSecureContext ? "" : " (sharing needs an https:// address)";
+          say(`PDF downloaded${why}. Open WhatsApp or email and attach it.` + note, "warn");
+        } else {
+          say("PDF downloaded. Tap New quote for the next job." + note, missing.length ? "warn" : "ok");
+        }
+      }
+    } catch (e) {
+      say(e.message || "Something went wrong.");
+    } finally {
+      busy = false;
+    }
+  }
+  $("download").addEventListener("click", () => run("download"));
+  $("share").addEventListener("click", () => run("share"));
+})();
+</script>
+</body>
+</html>

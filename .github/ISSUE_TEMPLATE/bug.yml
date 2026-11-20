@@ -1,0 +1,30 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "Please remove customer names, addresses and other personal details before posting. Security issues: use SECURITY.md instead."
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps or request to reproduce
+      description: Steps in the form, or the JSON sent to /api/quote.pdf (with personal details removed).
+      render: json
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `open-quote --version`, or the image tag.
+  - type: input
+    id: device
+    attributes:
+      label: Phone / browser
+      placeholder: e.g. iPhone 15, Safari 19
