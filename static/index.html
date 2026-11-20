@@ -9,11 +9,11 @@
 <style>
   :root {
     --bg: #f5f6f8; --card: #fff; --ink: #16181d; --muted: #5f6672; --line: #dfe2e7;
-    --accent: #1f6feb; --accent-ink: #fff; --danger: #c62828; --warn: #8a5a00;
+    --accent: #1f6feb; --accent-ink: #fff; --danger: #c62828; --warn: #8a5a00; --label: #444b57;
   }
   @media (prefers-color-scheme: dark) {
     :root { --bg: #0f1115; --card: #181b21; --ink: #eceef2; --muted: #9aa3af; --line: #2a2f38;
-            --accent: #4c8dff; --accent-ink: #fff; --danger: #ff6b6b; --warn: #f0b429; }
+            --accent: #4c8dff; --accent-ink: #fff; --danger: #ff6b6b; --warn: #f0b429; --label: #c3c9d2; }
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--ink);
@@ -21,26 +21,32 @@
   main { max-width: 640px; margin: 0 auto; padding: 16px 16px 190px; }
   h1 { font-size: 22px; margin: 8px 0 4px; }
   .sub { color: var(--muted); margin: 0 0 16px; font-size: 14px; }
-  .example-btn { margin: -6px 0 16px; font-size: 14px; padding: 8px 12px; }
+  .example { margin: -4px 0 16px; }
+  .example p { margin: 0 0 6px; font-size: 14px; color: var(--muted); }
+  .example-btn { width: 100%; min-height: 48px; font-weight: 600; border-color: var(--accent); color: var(--accent); }
   section { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
             padding: 14px; margin-bottom: 12px; }
-  h2 { font-size: 15px; margin: 0 0 10px; }
-  summary { font-weight: 600; font-size: 15px; cursor: pointer; }
+  h2 { font-size: 17px; margin: 0 0 10px; }
+  summary { font-weight: 600; font-size: 17px; cursor: pointer; min-height: 32px; }
   details[open] summary { margin-bottom: 10px; }
-  label { display: block; font-size: 13px; color: var(--muted); margin: 8px 0 4px; }
-  .hint { font-size: 12px; color: var(--muted); margin: 4px 0 0; }
+  label { display: block; font-size: 15px; font-weight: 500; color: var(--label); margin: 10px 0 4px; }
+  .hint { font-size: 13px; color: var(--muted); margin: 4px 0 0; }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  input[type=file] { padding: 8px; font-size: 15px; }
+  input[type=file]::file-selector-button { font: inherit; font-weight: 600; min-height: 40px; padding: 0 14px; margin-right: 10px;
+    border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink); cursor: pointer; }
   input, textarea, select { width: 100%; font: inherit; color: var(--ink); background: var(--bg);
                     border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
   textarea { resize: vertical; min-height: 44px; }
   .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .item { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 10px; }
   .item:first-child { border-top: 0; margin-top: 0; padding-top: 0; }
-  .item-nums { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; align-items: end; }
+  .item-nums { display: grid; grid-template-columns: 70px 1fr 1.3fr; gap: 10px; align-items: end; }
   .item-foot { display: flex; justify-content: space-between; align-items: center; }
   .item-total { font-variant-numeric: tabular-nums; font-weight: 600; }
   button { font: inherit; border-radius: 8px; border: 1px solid var(--line); padding: 10px 14px;
            background: var(--card); color: var(--ink); cursor: pointer; }
-  .link-btn { color: var(--danger); border-color: transparent; background: none; padding: 4px 0; font-size: 14px; }
+  .link-btn { color: var(--danger); border-color: transparent; background: none; padding: 0 4px; font-size: 15px; min-height: 44px; }
   .check { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
   .check input { width: auto; }
   .totals { font-variant-numeric: tabular-nums; }
@@ -53,8 +59,10 @@
   .logo-row { display: flex; gap: 12px; align-items: center; }
   .logo-row img { max-height: 48px; max-width: 140px; border-radius: 4px; background: #fff; }
   .bar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--card); border-top: 1px solid var(--line);
+         box-shadow: 0 -4px 12px rgba(0,0,0,.06);
          padding: 10px 16px calc(12px + env(safe-area-inset-bottom)); }
-  .bar-inner { max-width: 640px; margin: 0 auto; display: grid; grid-template-columns: auto 1fr 1fr; gap: 8px; }
+  .bar-inner { max-width: 640px; margin: 0 auto; display: grid; grid-template-columns: auto 1fr 1.2fr; gap: 8px; }
+  .bar-inner button { white-space: nowrap; min-height: 48px; }
   .primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
   #msg { max-width: 640px; margin: 0 auto 8px; color: var(--danger); font-size: 14px; }
   #msg.ok { color: var(--muted); }
@@ -69,7 +77,10 @@
 <main>
   <h1>Open Quote</h1>
   <p class="sub">Make a quote and send it as a PDF. Your details and your current draft are saved on this device only.</p>
-  <button type="button" id="try_example" class="example-btn" hidden>Try an example quote</button>
+  <div class="example" id="try_example" hidden>
+    <p>New here? See how it works in 10 seconds.</p>
+    <button type="button" id="try_example_btn" class="example-btn">Try an example quote</button>
+  </div>
 
   <section>
     <details id="biz" open>
@@ -159,7 +170,7 @@
   </div>
   <div class="bar-inner">
     <button type="button" id="new_quote">New quote</button>
-    <button type="button" id="download">Download PDF</button>
+    <button type="button" id="download">Save PDF</button>
     <button type="button" id="share" class="primary">Send quote</button>
   </div>
 </div>
@@ -471,9 +482,9 @@
     $("biz").open = false;
     $("try_example").hidden = true;
     changed();
-    say("Example quote loaded. Tap Download PDF or Send quote to try it. Your own saved details haven't changed.", "ok");
+    say("Example quote loaded. Tap Save PDF or Send quote to try it. Your own saved details haven't changed.", "ok");
   }
-  $("try_example").addEventListener("click", applyExample);
+  $("try_example_btn").addEventListener("click", applyExample);
   function readPrefill() {
     const hash = new URLSearchParams(location.hash.slice(1));
     const query = new URLSearchParams(location.search);

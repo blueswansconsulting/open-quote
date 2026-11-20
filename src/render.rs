@@ -14,6 +14,12 @@ const UNIT_RIGHT: f32 = 460.0;
 const BODY: f32 = 10.0;
 const LEADING: f32 = 13.0;
 const MUTED: f32 = 0.4;
+/// Darker grey for secondary figures that must stay readable (≥7:1).
+const SECONDARY: f32 = 0.3;
+const HEADER_FILL: f32 = 0.15;
+const TITLE: &str = "QUOTE";
+const TITLE_SIZE: f32 = 20.0;
+const NAME_SIZE: f32 = 20.0;
 const META_LABEL_GAP: f32 = 12.0;
 const LOGO_MAX_W: f32 = 150.0;
 const LOGO_MAX_H: f32 = 55.0;
@@ -67,11 +73,11 @@ impl Layout {
     fn table_header(&mut self) {
         let y = self.y;
         let p = self.page();
-        p.fill_rect(MARGIN, y - 6.0, CONTENT_WIDTH, 20.0, 0.93);
-        p.text(MARGIN + 6.0, y, Font::Bold, 9.0, 0.0, "Description");
-        p.text_right(QTY_RIGHT, y, Font::Bold, 9.0, 0.0, "Qty");
-        p.text_right(UNIT_RIGHT, y, Font::Bold, 9.0, 0.0, "Unit price");
-        p.text_right(RIGHT - 6.0, y, Font::Bold, 9.0, 0.0, "Amount");
+        p.fill_rect(MARGIN, y - 6.0, CONTENT_WIDTH, 20.0, HEADER_FILL);
+        p.text(MARGIN + 6.0, y, Font::Bold, 9.0, 1.0, "Description");
+        p.text_right(QTY_RIGHT, y, Font::Bold, 9.0, 1.0, "Qty");
+        p.text_right(UNIT_RIGHT, y, Font::Bold, 9.0, 1.0, "Unit price");
+        p.text_right(RIGHT - 6.0, y, Font::Bold, 9.0, 1.0, "Amount");
         self.y -= 26.0;
     }
 }
@@ -92,7 +98,7 @@ pub(crate) fn meta_label_right(value: &str) -> f32 {
 /// Width available to the business name/contact column: up to 300pt, but
 /// always clear of the widest label/value pair (and the QUOTE title).
 pub(crate) fn header_left_width(q: &Quote) -> f32 {
-    let mut meta_left = RIGHT - text_width("QUOTE", Font::Bold, 24.0);
+    let mut meta_left = RIGHT - text_width(TITLE, Font::Bold, TITLE_SIZE);
     for (label, value) in [
         ("Quote no.", &q.quote_number),
         ("Date", &q.date),
@@ -104,6 +110,65 @@ pub(crate) fn header_left_width(q: &Quote) -> f32 {
         }
     }
     (meta_left - MARGIN - 16.0).clamp(120.0, 300.0)
+}
+
+/// Lines of the "To accept this quote" box: (text, bold).
+pub(crate) fn accept_lines(q: &Quote) -> Vec<(String, bool)> {
+    let contacts: Vec<&str> = [q.business.phone.as_str(), q.business.email.as_str()]
+        .into_iter()
+        .filter(|s| !s.is_empty())
+        .collect();
+    let mut lines = Vec::new();
+    if contacts.is_empty() {
+        lines.push(("Reply to this message to accept.".to_string(), false));
+    } else {
+        lines.push(("Reply to this message, or get in touch:".to_string(), false));
+        lines.push((contacts.join("  ·  "), true));
+    }
+    if !q.valid_until.is_empty() {
+        lines.push((
+            format!("This quote is valid until {}.", q.valid_until),
+            false,
+        ));
+    }
+    lines
+}
+
+fn accept_block(l: &mut Layout, q: &Quote) {
+    const PAD: f32 = 10.0;
+    const LINE: f32 = 14.0;
+    let width = CONTENT_WIDTH - 2.0 * PAD;
+    let mut lines: Vec<(String, bool)> = Vec::new();
+    for (text, bold) in accept_lines(q) {
+        let font = if bold { Font::Bold } else { Font::Regular };
+        lines.extend(
+            wrap(&text, font, BODY, width)
+                .into_iter()
+                .map(|t| (t, bold)),
+        );
+    }
+    let height = PAD * 2.0 + 14.0 + lines.len() as f32 * LINE;
+    l.y -= 14.0;
+    l.ensure(height + 4.0);
+    let top = l.y + 10.0;
+    l.page()
+        .fill_rect(MARGIN, top - height, CONTENT_WIDTH, height, 0.95);
+    let mut y = top - PAD - 9.0;
+    l.page().text(
+        MARGIN + PAD,
+        y,
+        Font::Bold,
+        9.0,
+        0.0,
+        "TO ACCEPT THIS QUOTE",
+    );
+    y -= 16.0;
+    for (text, bold) in lines {
+        let font = if bold { Font::Bold } else { Font::Regular };
+        l.page().text(MARGIN + PAD, y, font, BODY, 0.0, &text);
+        y -= LINE;
+    }
+    l.y = top - height - 6.0;
 }
 
 pub(crate) fn footer_text(q: &Quote) -> String {
@@ -145,9 +210,10 @@ pub fn render_quote(q: &Quote) -> Vec<u8> {
     } else {
         left_y -= 6.0;
     }
-    for line in wrap(&q.business.name, Font::Bold, 18.0, left_width) {
-        l.page().text(MARGIN, left_y, Font::Bold, 18.0, 0.0, &line);
-        left_y -= 21.0;
+    for line in wrap(&q.business.name, Font::Bold, NAME_SIZE, left_width) {
+        l.page()
+            .text(MARGIN, left_y, Font::Bold, NAME_SIZE, 0.0, &line);
+        left_y -= 23.0;
     }
     let mut contact: Vec<String> = q
         .business
@@ -176,8 +242,8 @@ pub fn render_quote(q: &Quote) -> Vec<u8> {
 
     let mut right_y = header_top - 8.0;
     l.page()
-        .text_right(RIGHT, right_y, Font::Bold, 24.0, 0.0, "QUOTE");
-    right_y -= 22.0;
+        .text_right(RIGHT, right_y, Font::Bold, TITLE_SIZE, 0.45, TITLE);
+    right_y -= 20.0;
     for (label, value) in [
         ("Quote no.", &q.quote_number),
         ("Date", &q.date),
@@ -198,10 +264,13 @@ pub fn render_quote(q: &Quote) -> Vec<u8> {
         );
         right_y -= 13.0;
     }
-    l.y = left_y.min(right_y) - 18.0;
+    let rule_y = left_y.min(right_y) - 4.0;
+    l.page()
+        .line(MARGIN, rule_y, RIGHT, rule_y, 1.5, HEADER_FILL);
+    l.y = rule_y - 22.0;
 
     // Customer.
-    l.heading("QUOTE FOR");
+    l.heading("PREPARED FOR");
     let mut customer_lines = wrap(&q.customer.name, Font::Bold, 11.0, 300.0);
     let name_count = customer_lines.len();
     for part in q
@@ -237,8 +306,7 @@ pub fn render_quote(q: &Quote) -> Vec<u8> {
     l.table_header();
     for item in &q.lines {
         let desc = wrap(&item.description, Font::Regular, BODY, DESC_WIDTH);
-        let tag = item.kind.label();
-        let rows = desc.len() + usize::from(tag.is_some());
+        let rows = desc.len();
         for (i, line) in desc.iter().enumerate() {
             // Keep at least two rows of an item together with its numbers.
             let needed = if i == 0 {
@@ -280,15 +348,6 @@ pub fn render_quote(q: &Quote) -> Vec<u8> {
             }
             l.y -= LEADING;
         }
-        if let Some(tag) = tag {
-            if l.ensure(LEADING) {
-                l.table_header();
-            }
-            let y = l.y + 2.0;
-            l.page()
-                .text(MARGIN + 6.0, y, Font::Regular, 8.0, MUTED, tag);
-            l.y -= 11.0;
-        }
         l.y -= 4.0;
         let y = l.y + 8.0;
         l.page().line(MARGIN, y, RIGHT, y, 0.5, 0.85);
@@ -296,49 +355,60 @@ pub fn render_quote(q: &Quote) -> Vec<u8> {
     }
 
     // Totals.
-    let mut rows: Vec<(String, i64, bool, bool)> = Vec::new(); // label, amount, strong, muted
+    let mut rows: Vec<(String, String, bool, bool)> = Vec::new(); // label, value, strong, secondary
     if q.totals.labour > 0 {
-        rows.push(("Labour".into(), q.totals.labour, false, true));
+        rows.push(("Labour".into(), format_money(q.totals.labour), false, true));
     }
     if q.totals.materials > 0 {
-        rows.push(("Materials".into(), q.totals.materials, false, true));
+        rows.push((
+            "Materials".into(),
+            format_money(q.totals.materials),
+            false,
+            true,
+        ));
     }
-    rows.push(("Subtotal".into(), q.totals.subtotal, false, false));
+    rows.push((
+        "Subtotal".into(),
+        format_money(q.totals.subtotal),
+        false,
+        false,
+    ));
     if q.vat {
         rows.push((
             format!("VAT ({VAT_RATE_PERCENT}%)"),
-            q.totals.vat,
+            format_money(q.totals.vat),
             false,
             false,
         ));
+    } else {
+        rows.push(("VAT".into(), "Not charged".into(), false, false));
     }
-    rows.push(("Total".into(), q.totals.total, true, false));
-    l.ensure(rows.len() as f32 * 18.0 + 30.0);
+    rows.push(("Total".into(), format_money(q.totals.total), true, false));
+    l.ensure(rows.len() as f32 * 18.0 + 40.0);
     l.y -= 4.0;
-    for (label, amount, strong, muted) in rows {
-        let (font, size) = if strong {
-            (Font::Bold, 13.0)
-        } else {
-            (Font::Regular, BODY)
-        };
-        let gray = if muted { MUTED } else { 0.0 };
+    for (label, value, strong, secondary) in rows {
+        let gray = if secondary { SECONDARY } else { 0.0 };
         if strong {
-            let y = l.y + 13.0;
-            l.page().line(UNIT_RIGHT - 80.0, y, RIGHT, y, 1.0, 0.0);
-            l.y -= 4.0;
+            l.y -= 6.0;
+            let y = l.y;
+            let box_left = UNIT_RIGHT - 90.0;
+            l.page()
+                .fill_rect(box_left, y - 9.0, RIGHT - box_left, 28.0, 0.93);
+            let page = l.page();
+            page.text_right(UNIT_RIGHT, y, Font::Bold, 14.0, 0.0, &label);
+            page.text_right(RIGHT - 6.0, y, Font::Bold, 14.0, 0.0, &value);
+            l.y -= 26.0;
+        } else {
+            let y = l.y;
+            let page = l.page();
+            page.text_right(UNIT_RIGHT, y, Font::Regular, BODY, gray, &label);
+            page.text_right(RIGHT - 6.0, y, Font::Regular, BODY, gray, &value);
+            l.y -= 16.0;
         }
-        let y = l.y;
-        let page = l.page();
-        page.text_right(UNIT_RIGHT, y, font, size, gray, &label);
-        page.text_right(RIGHT - 6.0, y, font, size, gray, &format_money(amount));
-        l.y -= 18.0;
     }
-    if !q.vat {
-        let y = l.y;
-        l.page()
-            .text_right(RIGHT - 6.0, y, Font::Regular, 8.0, MUTED, "No VAT charged");
-        l.y -= 14.0;
-    }
+
+    // How to accept: the homeowner's next step, with the trade's contact details.
+    accept_block(&mut l, q);
 
     // Notes / terms.
     if !q.notes.is_empty() {
@@ -459,7 +529,8 @@ mod tests {
         assert!(pdf.starts_with(b"%PDF"));
         assert_eq!(count(&pdf, b"/Type /Page "), 1);
         assert!(count(&pdf, hex("THE WORK").as_bytes()) == 1);
-        assert!(count(&pdf, hex("Labour").as_bytes()) >= 2); // tag + totals row
+        assert!(count(&pdf, hex("Labour").as_bytes()) == 1); // totals split row
+        assert!(count(&pdf, hex("TO ACCEPT THIS QUOTE").as_bytes()) == 1);
     }
 
     #[test]
@@ -543,6 +614,31 @@ mod tests {
             pages
         );
         assert!(count(&pdf, hex("Existing fuse board").as_bytes()) == 1);
+    }
+
+    #[test]
+    fn accept_box_uses_contact_details_and_validity() {
+        let q = validate(sample(1, "")).unwrap();
+        let lines = accept_lines(&q);
+        assert!(lines
+            .iter()
+            .any(|(t, bold)| *bold && t.contains("07700 900123")));
+        assert!(lines
+            .iter()
+            .any(|(t, _)| t.contains("valid until 20 Dec 2026")));
+        let mut r = sample(1, "");
+        r.business.phone = String::new();
+        r.business.email = String::new();
+        let lines = accept_lines(&validate(r).unwrap());
+        assert_eq!(lines[0].0, "Reply to this message to accept.");
+    }
+
+    #[test]
+    fn vat_row_is_explicit_when_not_charged() {
+        let mut r = sample(1, "");
+        r.vat = false;
+        let pdf = render_quote(&validate(r).unwrap());
+        assert_eq!(count(&pdf, hex("Not charged").as_bytes()), 1);
     }
 
     #[test]

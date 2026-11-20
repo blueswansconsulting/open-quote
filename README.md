@@ -11,7 +11,7 @@ An alternative to building quotes from a Word or Excel quote template, and to jo
 
 Open it on your phone and make a real quote. Nothing you type is stored: the server builds the PDF and forgets it.
 
-**One-click example:** [open the demo with an example business, customer and quote already filled in](https://openquote.tradesites.ai/?utm_source=crm&utm_medium=email&utm_campaign=quote-follow-up#demo), then tap **Download PDF**. The link carries UTM tags, so you can see how campaign tracking survives.
+**One-click example:** [open the demo with an example business, customer and quote already filled in](https://openquote.tradesites.ai/?utm_source=crm&utm_medium=email&utm_campaign=quote-follow-up#demo), then tap **Save PDF**. The link carries UTM tags, so you can see how campaign tracking survives.
 
 Built and maintained by **[TradeSites](https://www.tradesites.ai/?utm_source=github&utm_medium=readme&utm_campaign=open-quote)**, which makes websites and follow-up systems for UK trades.
 

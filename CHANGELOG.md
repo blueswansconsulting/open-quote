@@ -4,6 +4,9 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+### Changed
+- PDF design: dominant business name, dark table header, explicit VAT row, boxed total, and a "To accept this quote" box with the trade's contact details. Readable form labels, focus rings, larger tap targets.
+
 ### Added
 - Live demo at https://openquote.tradesites.ai/.
 - Example mode: `#demo` links and a "Try an example quote" button fill in a complete made-up quote without touching saved settings.
