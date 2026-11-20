@@ -138,3 +138,55 @@ async fn accepts_photos_within_the_body_limit() {
     let v: Value = serde_json::from_slice(&bytes).unwrap();
     assert!(v["error"].as_str().unwrap().contains("Photo 1"));
 }
+
+async fn get(path: &str) -> (StatusCode, Vec<u8>) {
+    let res = open_quote::app()
+        .oneshot(Request::get(path).body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    let status = res.status();
+    (
+        status,
+        res.into_body().collect().await.unwrap().to_bytes().to_vec(),
+    )
+}
+
+#[tokio::test]
+async fn logo_endpoint_refuses_unsafe_urls() {
+    for (path, want) in [
+        ("/api/logo", StatusCode::BAD_REQUEST),
+        (
+            "/api/logo?url=http%3A%2F%2Fexample.com%2Fl.png",
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        (
+            "/api/logo?url=file%3A%2F%2F%2Fetc%2Fpasswd",
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        (
+            "/api/logo?url=https%3A%2F%2F127.0.0.1%2Fl.png",
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        (
+            "/api/logo?url=https%3A%2F%2Flocalhost%2Fl.png",
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        (
+            "/api/logo?url=https%3A%2F%2F169.254.169.254%2Flatest",
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        (
+            "/api/logo?url=https%3A%2F%2F10.0.0.1%3A5555%2Fv2%2F",
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        (
+            "/api/logo?url=https%3A%2F%2Fu%3Ap%40example.com%2Fl.png",
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+    ] {
+        let (status, body) = get(path).await;
+        assert_eq!(status, want, "{path}");
+        let v: Value = serde_json::from_slice(&body).unwrap();
+        assert!(v["error"].is_string(), "{path}");
+    }
+}

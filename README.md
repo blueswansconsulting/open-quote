@@ -85,7 +85,7 @@ A prebuilt image at `ghcr.io/blueswansconsulting/open-quote` will be published w
 
 ### From source
 
-You need Rust 1.87 or newer.
+You need Rust 1.88 or newer.
 
 ```sh
 git clone https://github.com/blueswansconsulting/open-quote
@@ -150,6 +150,8 @@ https://quotes.example.com/#customer_name=Mrs%20Jones&customer_address=2%20Low%2
 | `vat` | `1` | `1` or `0` |
 | `quote_number` | `SE-0042` | Optional. Otherwise the next number is used |
 | `notes` | `50% deposit` | Replaces the saved terms for this quote |
+| `logo` | `https://your-site.co.uk/logo.png` | JPEG, PNG, GIF, WebP or SVG, up to 1 MB, on a public `https://` address. Used for this quote only; the trade's saved logo isn't replaced |
+| `demo` | (no value) | Loads the full example quote. Combine it with `logo`: `#demo&logo=https://…` |
 
 ### Live examples with UTM tracking
 
@@ -172,6 +174,16 @@ What you'll see:
 - The customer, address, job and two priced lines are filled in, with VAT on and a total of **£774.00**.
 - The address bar changes to `https://openquote.tradesites.ai/?utm_source=crm&utm_medium=email&utm_campaign=quote-follow-up`. The customer details have gone, but the UTM tags stay for your analytics.
 - Your server and proxy only ever receive the `?utm_…` part.
+
+**How logo links are fetched safely:** the server downloads the logo for the browser, because most websites don't let other sites copy their images. The download:
+
+- only uses `https` on the standard port, and refuses addresses containing a username or password;
+- checks the DNS answer and only connects to public addresses (no localhost, private networks or cloud metadata), including after redirects;
+- follows at most 3 redirects, gives up after 5 seconds and accepts at most 1 MB;
+- checks the file is an image from its contents, not from the name or headers;
+- runs at most 4 downloads at a time.
+
+The logo is returned as a sandboxed download that's never shown as a page, then converted to JPEG on the device. Nothing is stored or logged.
 
 URL-encode the values. Most CRMs do this for you, and `|` becomes `%7C`. The trade's own business details, logo and trust line always come from their saved settings, never from the link.
 

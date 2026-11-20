@@ -224,6 +224,27 @@ fn decode_jpeg(field: &str, input: &str, max_bytes: usize) -> Result<Jpeg, Strin
     Jpeg::parse(bytes).map_err(|e| format!("{field}: {e}"))
 }
 
+/// Accept "tradesites.ai/listing" as well as a full URL: a bare domain gets
+/// `https://` added. Anything with another scheme is left for `valid_link`.
+pub fn normalize_link(input: &str) -> String {
+    let link = input.trim();
+    if link.is_empty() || link.contains("://") {
+        return link.to_string();
+    }
+    let host = link.split(['/', '?', '#']).next().unwrap_or("");
+    let looks_like_domain = host.contains('.')
+        && !host.starts_with('.')
+        && !host.ends_with('.')
+        && host
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-');
+    if looks_like_domain {
+        format!("https://{link}")
+    } else {
+        link.to_string()
+    }
+}
+
 fn valid_link(url: &str) -> bool {
     (url.starts_with("https://") || url.starts_with("http://"))
         && url.len() > "https://".len()
@@ -248,7 +269,7 @@ pub fn validate(req: QuoteRequest) -> Result<Quote, String> {
     let scope = clean(&req.scope, true);
     let notes = clean(&req.notes, true);
     let footer_note = clean(&req.footer_note, false);
-    let footer_link = req.footer_link.trim().to_string();
+    let footer_link = normalize_link(&req.footer_link);
 
     if business.name.is_empty() {
         return Err("Business name is required".into());
@@ -567,9 +588,29 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn bare_domains_get_https() {
+        assert_eq!(normalize_link("tradesites.ai"), "https://tradesites.ai");
+        assert_eq!(
+            normalize_link(" www.tradesites.ai/listing/sparks "),
+            "https://www.tradesites.ai/listing/sparks"
+        );
+        assert_eq!(
+            normalize_link("https://tradesites.ai"),
+            "https://tradesites.ai"
+        );
+        assert_eq!(normalize_link("javascript:alert(1)"), "javascript:alert(1)");
+        assert_eq!(normalize_link("localhost"), "localhost");
+        let mut r = request(vec![item("x", 1.0, 1.0)], false);
+        r.footer_link = "tradesites.ai".into();
+        assert_eq!(validate(r).unwrap().footer_link, "https://tradesites.ai");
+    }
+
+    #[test]
     fn footer_link_and_rating_are_validated() {
         let mut r = request(vec![item("x", 1.0, 1.0)], false);
         r.footer_link = "javascript:alert(1)".into();
+        assert!(validate(r.clone()).unwrap_err().contains("Listing link"));
+        r.footer_link = "not a link".into();
         assert!(validate(r).unwrap_err().contains("Listing link"));
         let mut r = request(vec![item("x", 1.0, 1.0)], false);
         r.footer_link = "https://electriciansranked.co.uk/x y".into();

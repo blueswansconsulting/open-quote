@@ -17,11 +17,11 @@ cargo clippy --all-targets --locked -- -D warnings
 step "tests"
 cargo test --locked
 
-if rustup toolchain list 2>/dev/null | grep -q '^1\.87'; then
-  step "MSRV 1.87"
-  cargo +1.87 test --locked
+if rustup toolchain list 2>/dev/null | grep -q '^1\.88'; then
+  step "MSRV 1.88"
+  cargo +1.88 test --locked
 else
-  skip "MSRV check (install with: rustup toolchain install 1.87 --profile minimal)"
+  skip "MSRV check (install with: rustup toolchain install 1.88 --profile minimal)"
 fi
 
 if command -v cargo-deny >/dev/null 2>&1; then

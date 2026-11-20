@@ -105,7 +105,7 @@
       <label for="f_note">Trust line on every quote (optional)</label>
       <input id="f_note" maxlength="120" placeholder="e.g. Verified on Electricians Ranked">
       <label for="f_link">Link to your listing or reviews</label>
-      <input id="f_link" type="url" inputmode="url" maxlength="300" placeholder="https://">
+      <input id="f_link" type="text" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="300" placeholder="e.g. tradesites.ai">
       <div class="row">
         <div><label for="f_rating">Rating (out of 5)</label><input id="f_rating" type="number" inputmode="decimal" min="0" max="5" step="0.1"></div>
         <div><label for="f_reviews">Number of reviews</label><input id="f_reviews" type="number" inputmode="numeric" min="0" step="1"></div>
@@ -213,24 +213,32 @@
   if ($("b_name").value.trim()) $("biz").open = false;
   $("vat").checked = store.get("qm_vat") === "1";
   $("q_notes").value = store.get("qm_notes") ?? DEFAULT_NOTES;
-  $("q_notes").addEventListener("input", () => store.set("qm_notes", $("q_notes").value));
+  $("q_notes").addEventListener("input", () => { if (!exampleActive) store.set("qm_notes", $("q_notes").value); });
 
   // ---------- images: downscale on the device before upload ----------
   async function toJpeg(file, maxSide, quality) {
-    let source, w, h;
-    if (window.createImageBitmap) {
-      source = await createImageBitmap(file);
-      w = source.width; h = source.height;
-    } else {
-      source = await new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = () => reject(new Error("That file isn't an image we can read."));
-        img.src = URL.createObjectURL(file);
-      });
-      w = source.naturalWidth; h = source.naturalHeight;
+    let source = null, w = 0, h = 0;
+    const isSvg = (file.type || "").includes("svg");
+    if (window.createImageBitmap && !isSvg) {
+      try { source = await createImageBitmap(file); w = source.width; h = source.height; } catch { source = null; }
     }
-    const scale = Math.min(1, maxSide / Math.max(w, h));
+    if (!source) {
+      // <img> decodes everything else, including SVG logos.
+      const url = URL.createObjectURL(file);
+      try {
+        source = await new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = () => reject(new Error("That file isn't an image we can read."));
+          img.src = url;
+        });
+      } finally {
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+      w = source.naturalWidth || 600; h = source.naturalHeight || 200;
+    }
+    // Vector logos have no fixed resolution: render them at full size.
+    const scale = isSvg ? maxSide / Math.max(w, h) : Math.min(1, maxSide / Math.max(w, h));
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.round(w * scale));
     canvas.height = Math.max(1, Math.round(h * scale));
@@ -243,6 +251,32 @@
   const dataUrlBytes = (u) => Math.floor((u.length - u.indexOf(",") - 1) * 3 / 4);
 
   let logo = store.get("qm_logo") || "";
+  // True when the on-screen logo came from a prefill link. A link logo is
+  // used for that quote (and kept in its draft) but never replaces the
+  // trade's saved logo.
+  let linkLogo = false;
+  let logoRequest = 0; // bumped whenever the logo changes, to drop stale fetches
+  async function loadLinkLogo(url) {
+    const mine = ++logoRequest;
+    try {
+      const res = await fetch("/api/logo?url=" + encodeURIComponent(url));
+      if (mine !== logoRequest) return;
+      if (!res.ok) {
+        let m = "Couldn't load the logo from the link.";
+        try { m = (await res.json()).error || m; } catch {}
+        say(m, "warn");
+        return;
+      }
+      const blob = await res.blob();
+      let data = await toJpeg(blob, 600, 0.85);
+      if (dataUrlBytes(data) > 280 * 1024) data = await toJpeg(blob, 400, 0.7);
+      if (mine !== logoRequest) return;
+      logo = data; linkLogo = true;
+      showLogo(); saveDraft();
+    } catch {
+      say("Couldn't load the logo from the link.", "warn");
+    }
+  }
   function showLogo() {
     $("logo_preview").hidden = !logo;
     $("logo_remove").hidden = !logo;
@@ -255,14 +289,18 @@
     try {
       let url = await toJpeg(file, 600, 0.85);
       if (dataUrlBytes(url) > 280 * 1024) url = await toJpeg(file, 400, 0.7);
-      logo = url;
+      logoRequest++; logo = url; linkLogo = false;
       if (!store.set("qm_logo", logo)) say("Logo added, but this browser won't save it for next time.", "warn");
       showLogo();
     } catch {
       say("Couldn't read that image. Try a JPEG or PNG.");
     }
   });
-  $("logo_remove").addEventListener("click", () => { logo = ""; store.del("qm_logo"); showLogo(); });
+  $("logo_remove").addEventListener("click", () => {
+    logoRequest++;
+    if (!linkLogo) store.del("qm_logo");
+    logo = ""; linkLogo = false; showLogo(); saveDraft();
+  });
   showLogo();
 
   let photos = []; // { data, caption } kept in memory only
@@ -328,6 +366,17 @@
   // ---------- dates (local time, not UTC) ----------
   const isoLocal = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const parseIso = (s) => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; };
+  // "tradesites.ai/listing" -> "https://tradesites.ai/listing" (mirrors the server).
+  function normalizeLink(input) {
+    const link = input.trim();
+    if (!link || link.includes("://")) return link;
+    const host = link.split(/[/?#]/)[0];
+    return /^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$/.test(host) ? "https://" + link : link;
+  }
+  $("f_link").addEventListener("change", () => {
+    $("f_link").value = normalizeLink($("f_link").value);
+    store.set("qm_f_link", $("f_link").value);
+  });
   const fmtDate = (d) => d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
   // ---------- line items (built with DOM APIs, never innerHTML) ----------
@@ -365,6 +414,7 @@
     rm.addEventListener("click", () => {
       row.remove();
       if (!$("items").children.length) addItem();
+      editedAfterSend(null);
       changed();
     });
     const total = document.createElement("span");
@@ -420,13 +470,29 @@
       quote_number: $("q_number").value,
       date: $("q_date").value,
       days: $("q_days").value,
+      notes: $("q_notes").value,
       sent: sentNumber,
       example: exampleActive,
+      link_logo: linkLogo ? logo : null,
     }));
   }
   function changed() { recalc(); saveDraft(); }
 
+  // Editing a quote you've already sent gives it a new number, so two
+  // different quotes never share one.
+  function editedAfterSend(target) {
+    if (sentNumber === null) return;
+    if ((!target || target.id !== "q_number") && $("q_number").value === sentNumber) {
+      $("q_number").value = nextNumber();
+      say(`You've changed a quote you already sent, so this one is now ${$("q_number").value}. Change the number back if you're re-sending the same quote.`, "ok");
+    }
+    sentNumber = null;
+  }
+
   function startFresh() {
+    logoRequest++;
+    if (linkLogo) { logo = store.get("qm_logo") || ""; linkLogo = false; showLogo(); }
+    $("q_notes").value = store.get("qm_notes") ?? DEFAULT_NOTES;
     if (exampleActive) {
       // Leaving the example: put the trade's own saved details back.
       for (const id of SETTINGS) $(id).value = store.get("qm_" + id) ?? "";
@@ -449,7 +515,7 @@
   // Prefer the #fragment: it is never sent to the server, so customer details
   // stay out of server and proxy logs. ?query works too. Either way the
   // personal fields are removed from the address bar; utm_* tags are kept.
-  const PREFILL_KEYS = ["customer_name", "customer_address", "job", "notes", "quote_number", "vat", "item", "demo"];
+  const PREFILL_KEYS = ["customer_name", "customer_address", "job", "notes", "quote_number", "vat", "item", "demo", "logo"];
 
   // ---------- example quote (#demo link or the "Try an example" button) ----------
   // Fills the whole form with a made-up business and job so a visitor can
@@ -498,8 +564,14 @@
     return source;
   }
   function applyPrefill(p) {
-    if (p.has("demo")) { applyExample(); return; }
+    const logoUrl = (p.get("logo") || "").trim();
+    if (p.has("demo")) {
+      applyExample();
+      if (logoUrl) loadLinkLogo(logoUrl);
+      return;
+    }
     startFresh();
+    if (logoUrl) loadLinkLogo(logoUrl);
     const take = (k, max) => (p.get(k) || "").slice(0, max);
     if (p.has("customer_name")) $("c_name").value = take("customer_name", 100);
     if (p.has("customer_address")) $("c_address").value = take("customer_address", 300);
@@ -538,6 +610,7 @@
     $("c_name").value = draft.customer?.name || "";
     $("c_address").value = draft.customer?.address || "";
     $("q_scope").value = draft.scope || "";
+    if (typeof draft.notes === "string") $("q_notes").value = draft.notes;
     draft.items.forEach((it) => addItem(it));
     if (!draft.items.length) addItem();
     $("q_number").value = draft.quote_number || nextNumber();
@@ -545,6 +618,9 @@
     $("q_days").value = draft.days || "30";
     sentNumber = typeof draft.sent === "string" ? draft.sent : null;
     exampleActive = draft.example === true;
+    if (typeof draft.link_logo === "string" && draft.link_logo.startsWith("data:image/jpeg")) {
+      logo = draft.link_logo; linkLogo = true; showLogo();
+    }
     // The example business is never saved, so put it back on screen.
     if (exampleActive) {
       for (const [id, v] of Object.entries(EXAMPLE.business)) $(id).value = v;
@@ -556,13 +632,7 @@
   }
   document.querySelector("main").addEventListener("input", (e) => {
     if (e.target.closest("#biz") || e.target.type === "file") return;
-    if (sentNumber !== null) {
-      if (e.target.id !== "q_number" && $("q_number").value === sentNumber) {
-        $("q_number").value = nextNumber();
-        say(`You've changed a quote you already sent, so this one is now ${$("q_number").value}. Change the number back if you're re-sending the same quote.`, "ok");
-      }
-      sentNumber = null;
-    }
+    editedAfterSend(e.target);
     changed();
   });
   $("vat").addEventListener("change", () => { store.set("qm_vat", $("vat").checked ? "1" : "0"); changed(); });
@@ -601,7 +671,7 @@
       vat: $("vat").checked,
       notes: $("q_notes").value,
       footer_note: $("f_note").value,
-      footer_link: $("f_link").value.trim(),
+      footer_link: normalizeLink($("f_link").value),
       rating: Number.isFinite(rating) ? rating : null,
       review_count: Number.isFinite(reviews) && reviews >= 0 ? reviews : null,
       logo,
@@ -619,7 +689,7 @@
     const bad = body.items.findIndex((i) => !i.description || !(i.quantity > 0) || !(i.unit_price >= 0));
     if (bad >= 0) throw new Error(`Item ${bad + 1}: add a description, quantity and price.`);
     if (body.footer_link && !/^https?:\/\/\S+$/.test(body.footer_link)) {
-      $("biz").open = true; $("f_link").focus(); throw new Error("The listing link must start with https://");
+      $("biz").open = true; $("f_link").focus(); throw new Error("The listing link should be a web address, like tradesites.ai");
     }
 
     let res;

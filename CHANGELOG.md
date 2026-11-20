@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+### Added
+- `logo=` in prefill links: fetches a public https logo (JPEG/PNG/GIF/WebP/SVG) with SSRF protections; used for that quote only.
+- Listing links accept a bare domain (`tradesites.ai` becomes `https://tradesites.ai`).
+
 ### Changed
 - PDF design: dominant business name, dark table header, explicit VAT row, boxed total, and a "To accept this quote" box with the trade's contact details. Readable form labels, focus rings, larger tap targets.
 
