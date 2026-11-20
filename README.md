@@ -4,7 +4,12 @@
 
 An alternative to building quotes from a Word or Excel quote template, and to job-management apps built for whole teams. It's made for electricians, plumbers, roofers, builders and other one-person trade businesses.
 
+[![Live demo](https://img.shields.io/badge/live%20demo-openquote.tradesites.ai-1f6feb)](https://openquote.tradesites.ai/)
 [![Licence: AGPL-3.0](https://img.shields.io/badge/licence-AGPL--3.0-blue.svg)](LICENSE)
+
+### ▶ [Try the live demo: openquote.tradesites.ai](https://openquote.tradesites.ai/)
+
+Open it on your phone and make a real quote. Nothing you type is stored: the server builds the PDF and forgets it. Or [open the demo pre-filled from a CRM link](https://openquote.tradesites.ai/#customer_name=Mrs%20Jones&customer_address=2%20Low%20Road%0ABristol&job=Replace%20consumer%20unit%20and%20certify&item=Consumer%20unit%20(10-way%20RCBO)%7C1%7C285%7Cmaterials&item=Labour%7C8%7C45%7Clabour&vat=1). Add your business name to send it.
 
 Built and maintained by **[TradeSites](https://www.tradesites.ai/?utm_source=github&utm_medium=readme&utm_campaign=open-quote)**, which makes websites and follow-up systems for UK trades.
 

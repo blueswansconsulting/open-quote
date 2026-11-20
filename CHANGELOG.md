@@ -4,6 +4,9 @@ All notable changes to this project are documented here. The format is based on 
 
 ## [Unreleased]
 
+### Added
+- Live demo at https://openquote.tradesites.ai/.
+
 ## [0.1.0] - 2026-11-20
 
 ### Added
