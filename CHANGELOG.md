@@ -6,6 +6,7 @@ All notable changes to this project are documented here. The format is based on 
 
 ### Added
 - Live demo at https://openquote.tradesites.ai/.
+- Example mode: `#demo` links and a "Try an example quote" button fill in a complete made-up quote without touching saved settings.
 
 ## [0.1.0] - 2026-11-20
 

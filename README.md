@@ -9,7 +9,9 @@ An alternative to building quotes from a Word or Excel quote template, and to jo
 
 ### ▶ [Try the live demo: openquote.tradesites.ai](https://openquote.tradesites.ai/)
 
-Open it on your phone and make a real quote. Nothing you type is stored: the server builds the PDF and forgets it. Or [open the demo pre-filled from a CRM link, with UTM tags](https://openquote.tradesites.ai/?utm_source=crm&utm_medium=email&utm_campaign=quote-follow-up#customer_name=Mrs%20Jones&customer_address=2%20Low%20Road%0ABristol&job=Replace%20consumer%20unit%20and%20certify&item=Consumer%20unit%20(10-way%20RCBO)%7C1%7C285%7Cmaterials&item=Labour%7C8%7C45%7Clabour&vat=1). Add your business name to send it.
+Open it on your phone and make a real quote. Nothing you type is stored: the server builds the PDF and forgets it.
+
+**One-click example:** [open the demo with an example business, customer and quote already filled in](https://openquote.tradesites.ai/?utm_source=crm&utm_medium=email&utm_campaign=quote-follow-up#demo), then tap **Download PDF**. The link carries UTM tags, so you can see how campaign tracking survives.
 
 Built and maintained by **[TradeSites](https://www.tradesites.ai/?utm_source=github&utm_medium=readme&utm_campaign=open-quote)**, which makes websites and follow-up systems for UK trades.
 
@@ -149,7 +151,10 @@ https://quotes.example.com/#customer_name=Mrs%20Jones&customer_address=2%20Low%2
 | `quote_number` | `SE-0042` | Optional. Otherwise the next number is used |
 | `notes` | `50% deposit` | Replaces the saved terms for this quote |
 
-### Live example with UTM tracking
+### Live examples with UTM tracking
+
+- **Everything filled in (one click to a PDF):** [`…?utm_source=crm&utm_medium=email&utm_campaign=quote-follow-up#demo`](https://openquote.tradesites.ai/?utm_source=crm&utm_medium=email&utm_campaign=quote-follow-up#demo). `#demo` loads a made-up business, customer and quote, and doesn't change anyone's saved settings.
+- **Customer and job from your CRM (below):** the trade's own saved business details complete the quote.
 
 **[Open this link on the live demo](https://openquote.tradesites.ai/?utm_source=crm&utm_medium=email&utm_campaign=quote-follow-up#customer_name=Mrs%20Jones&customer_address=2%20Low%20Road%0ABristol&job=Replace%20consumer%20unit%20and%20certify&item=Consumer%20unit%20(10-way%20RCBO)%7C1%7C285%7Cmaterials&item=Labour%7C8%7C45%7Clabour&vat=1)**
 

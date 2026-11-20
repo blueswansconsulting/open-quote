@@ -21,6 +21,7 @@
   main { max-width: 640px; margin: 0 auto; padding: 16px 16px 190px; }
   h1 { font-size: 22px; margin: 8px 0 4px; }
   .sub { color: var(--muted); margin: 0 0 16px; font-size: 14px; }
+  .example-btn { margin: -6px 0 16px; font-size: 14px; padding: 8px 12px; }
   section { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
             padding: 14px; margin-bottom: 12px; }
   h2 { font-size: 15px; margin: 0 0 10px; }
@@ -68,6 +69,7 @@
 <main>
   <h1>Open Quote</h1>
   <p class="sub">Make a quote and send it as a PDF. Your details and your current draft are saved on this device only.</p>
+  <button type="button" id="try_example" class="example-btn" hidden>Try an example quote</button>
 
   <section>
     <details id="biz" open>
@@ -308,6 +310,9 @@
   // The number of the last quote sent from this draft. Editing the quote
   // afterwards moves it to a fresh number, so two customers never share one.
   let sentNumber = null;
+  // True while the on-screen quote is the example, so it never touches the
+  // trade's real quote numbering.
+  let exampleActive = false;
 
   // ---------- dates (local time, not UTC) ----------
   const isoLocal = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -405,11 +410,18 @@
       date: $("q_date").value,
       days: $("q_days").value,
       sent: sentNumber,
+      example: exampleActive,
     }));
   }
   function changed() { recalc(); saveDraft(); }
 
   function startFresh() {
+    if (exampleActive) {
+      // Leaving the example: put the trade's own saved details back.
+      for (const id of SETTINGS) $(id).value = store.get("qm_" + id) ?? "";
+      $("vat").checked = store.get("qm_vat") === "1";
+      $("try_example").hidden = !!(store.get("qm_b_name") || "").trim();
+    }
     $("c_name").value = ""; $("c_address").value = ""; $("q_scope").value = "";
     $("items").replaceChildren(); addItem();
     photos = []; renderPhotos();
@@ -418,6 +430,7 @@
     $("q_days").value = "30";
     $("fallback").hidden = true;
     sentNumber = null;
+    exampleActive = false;
     changed();
   }
 
@@ -425,7 +438,42 @@
   // Prefer the #fragment: it is never sent to the server, so customer details
   // stay out of server and proxy logs. ?query works too. Either way the
   // personal fields are removed from the address bar; utm_* tags are kept.
-  const PREFILL_KEYS = ["customer_name", "customer_address", "job", "notes", "quote_number", "vat", "item"];
+  const PREFILL_KEYS = ["customer_name", "customer_address", "job", "notes", "quote_number", "vat", "item", "demo"];
+
+  // ---------- example quote (#demo link or the "Try an example" button) ----------
+  // Fills the whole form with a made-up business and job so a visitor can
+  // generate a PDF in one tap. The example business is shown on screen only:
+  // it is never written to this device's saved settings.
+  const EXAMPLE = {
+    business: { b_name: "Sparks Electrical (example)", b_phone: "0117 496 0000", b_email: "hello@sparks-electrical.example",
+                b_address: "1 Example Street\nBristol BS1 0AA", b_vat: "GB000000000",
+                f_note: "Verified on Electricians Ranked (example)", f_link: "", f_rating: "4.9", f_reviews: "37" },
+    customer_name: "Mrs Jones", customer_address: "2 Low Road\nBristol BS2 0XX",
+    job: "Replace the old fuse board with an 18th Edition RCBO consumer unit, test every circuit and issue an Electrical Installation Certificate. Work notified under Part P.",
+    items: [
+      { description: "Consumer unit (10-way RCBO)", quantity: "1", unit_price: "285", kind: "materials" },
+      { description: "Labour: install, test and certify", quantity: "8", unit_price: "45", kind: "labour" },
+    ],
+    notes: "Example quote made with Open Quote. 50% deposit on acceptance; any extra work agreed with you before it starts.",
+  };
+  function applyExample() {
+    startFresh();
+    exampleActive = true;
+    for (const [id, v] of Object.entries(EXAMPLE.business)) $(id).value = v; // no input event: not saved
+    $("c_name").value = EXAMPLE.customer_name;
+    $("c_address").value = EXAMPLE.customer_address;
+    $("q_scope").value = EXAMPLE.job;
+    $("q_notes").value = EXAMPLE.notes;
+    $("vat").checked = true;
+    $("items").replaceChildren();
+    EXAMPLE.items.forEach((it) => addItem(it));
+    $("q_number").value = "EX-0001";
+    $("biz").open = false;
+    $("try_example").hidden = true;
+    changed();
+    say("Example quote loaded. Tap Download PDF or Send quote to try it. Your own saved details haven't changed.", "ok");
+  }
+  $("try_example").addEventListener("click", applyExample);
   function readPrefill() {
     const hash = new URLSearchParams(location.hash.slice(1));
     const query = new URLSearchParams(location.search);
@@ -439,6 +487,7 @@
     return source;
   }
   function applyPrefill(p) {
+    if (p.has("demo")) { applyExample(); return; }
     startFresh();
     const take = (k, max) => (p.get(k) || "").slice(0, max);
     if (p.has("customer_name")) $("c_name").value = take("customer_name", 100);
@@ -484,6 +533,12 @@
     $("q_date").value = draft.date || isoLocal(new Date());
     $("q_days").value = draft.days || "30";
     sentNumber = typeof draft.sent === "string" ? draft.sent : null;
+    exampleActive = draft.example === true;
+    // The example business is never saved, so put it back on screen.
+    if (exampleActive) {
+      for (const [id, v] of Object.entries(EXAMPLE.business)) $(id).value = v;
+      $("vat").checked = true;
+    }
     recalc();
   } else {
     startFresh();
@@ -500,6 +555,7 @@
     changed();
   });
   $("vat").addEventListener("change", () => { store.set("qm_vat", $("vat").checked ? "1" : "0"); changed(); });
+  if (!prefill && !(store.get("qm_b_name") || "").trim() && !$("c_name").value.trim()) $("try_example").hidden = false;
 
   let armed = null;
   $("new_quote").addEventListener("click", () => {
@@ -616,8 +672,10 @@
           // Any other share failure: fall through to download + manual send.
         }
       }
-      markUsed(body.quote_number);
-      sentNumber = body.quote_number;
+      if (!exampleActive) {
+        markUsed(body.quote_number);
+        sentNumber = body.quote_number;
+      }
       saveDraft();
       if (shared) {
         say("Quote sent. Tap New quote for the next job." + note, missing.length ? "warn" : "ok");
