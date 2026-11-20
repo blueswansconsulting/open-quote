@@ -120,9 +120,15 @@ pub(crate) fn accept_lines(q: &Quote) -> Vec<(String, bool)> {
         .collect();
     let mut lines = Vec::new();
     if contacts.is_empty() {
-        lines.push(("Reply to this message to accept.".to_string(), false));
+        lines.push((
+            "To accept, reply to the person who sent you this quote.".to_string(),
+            false,
+        ));
     } else {
-        lines.push(("Reply to this message, or get in touch:".to_string(), false));
+        lines.push((
+            "To accept, or if you have any questions, contact us:".to_string(),
+            false,
+        ));
         lines.push((contacts.join("  ·  "), true));
     }
     if !q.valid_until.is_empty() {
@@ -242,7 +248,7 @@ pub fn render_quote(q: &Quote) -> Vec<u8> {
 
     let mut right_y = header_top - 8.0;
     l.page()
-        .text_right(RIGHT, right_y, Font::Bold, TITLE_SIZE, 0.45, TITLE);
+        .text_right(RIGHT, right_y, Font::Bold, TITLE_SIZE, 0.4, TITLE);
     right_y -= 20.0;
     for (label, value) in [
         ("Quote no.", &q.quote_number),
@@ -414,7 +420,7 @@ pub fn render_quote(q: &Quote) -> Vec<u8> {
     if !q.notes.is_empty() {
         l.y -= 14.0;
         l.heading("NOTES");
-        l.paragraph(&q.notes, 9.0, 12.0);
+        l.paragraph(&q.notes, BODY, LEADING);
     }
 
     // Photos.
@@ -630,7 +636,18 @@ mod tests {
         r.business.phone = String::new();
         r.business.email = String::new();
         let lines = accept_lines(&validate(r).unwrap());
-        assert_eq!(lines[0].0, "Reply to this message to accept.");
+        assert_eq!(
+            lines[0].0,
+            "To accept, reply to the person who sent you this quote."
+        );
+        assert!(lines
+            .iter()
+            .all(|(t, _)| !t.trim().is_empty() && !t.contains("·  ·")));
+        // Only one contact: no dangling separator.
+        let mut r = sample(1, "");
+        r.business.email = String::new();
+        let lines = accept_lines(&validate(r).unwrap());
+        assert_eq!(lines[1].0, "07700 900123");
     }
 
     #[test]
