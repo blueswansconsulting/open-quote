@@ -2,3 +2,7 @@ target/
 *.pdf
 .env
 !examples/*.pdf
+
+# Private deploy config (not published)
+/config/deploy.yml
+/.kamal/
