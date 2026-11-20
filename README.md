@@ -9,7 +9,7 @@ An alternative to building quotes from a Word or Excel quote template, and to jo
 
 ### ▶ [Try the live demo: openquote.tradesites.ai](https://openquote.tradesites.ai/)
 
-Open it on your phone and make a real quote. Nothing you type is stored: the server builds the PDF and forgets it. Or [open the demo pre-filled from a CRM link](https://openquote.tradesites.ai/#customer_name=Mrs%20Jones&customer_address=2%20Low%20Road%0ABristol&job=Replace%20consumer%20unit%20and%20certify&item=Consumer%20unit%20(10-way%20RCBO)%7C1%7C285%7Cmaterials&item=Labour%7C8%7C45%7Clabour&vat=1). Add your business name to send it.
+Open it on your phone and make a real quote. Nothing you type is stored: the server builds the PDF and forgets it. Or [open the demo pre-filled from a CRM link, with UTM tags](https://openquote.tradesites.ai/?utm_source=crm&utm_medium=email&utm_campaign=quote-follow-up#customer_name=Mrs%20Jones&customer_address=2%20Low%20Road%0ABristol&job=Replace%20consumer%20unit%20and%20certify&item=Consumer%20unit%20(10-way%20RCBO)%7C1%7C285%7Cmaterials&item=Labour%7C8%7C45%7Clabour&vat=1). Add your business name to send it.
 
 Built and maintained by **[TradeSites](https://www.tradesites.ai/?utm_source=github&utm_medium=readme&utm_campaign=open-quote)**, which makes websites and follow-up systems for UK trades.
 
@@ -148,6 +148,25 @@ https://quotes.example.com/#customer_name=Mrs%20Jones&customer_address=2%20Low%2
 | `vat` | `1` | `1` or `0` |
 | `quote_number` | `SE-0042` | Optional. Otherwise the next number is used |
 | `notes` | `50% deposit` | Replaces the saved terms for this quote |
+
+### Live example with UTM tracking
+
+**[Open this link on the live demo](https://openquote.tradesites.ai/?utm_source=crm&utm_medium=email&utm_campaign=quote-follow-up#customer_name=Mrs%20Jones&customer_address=2%20Low%20Road%0ABristol&job=Replace%20consumer%20unit%20and%20certify&item=Consumer%20unit%20(10-way%20RCBO)%7C1%7C285%7Cmaterials&item=Labour%7C8%7C45%7Clabour&vat=1)**
+
+```
+https://openquote.tradesites.ai/
+  ?utm_source=crm&utm_medium=email&utm_campaign=quote-follow-up      ← campaign tracking (kept)
+  #customer_name=Mrs%20Jones&customer_address=2%20Low%20Road%0ABristol ← customer (never sent to the server)
+  &job=Replace%20consumer%20unit%20and%20certify
+  &item=Consumer%20unit%20(10-way%20RCBO)%7C1%7C285%7Cmaterials
+  &item=Labour%7C8%7C45%7Clabour&vat=1
+```
+
+What you'll see:
+
+- The customer, address, job and two priced lines are filled in, with VAT on and a total of **£774.00**.
+- The address bar changes to `https://openquote.tradesites.ai/?utm_source=crm&utm_medium=email&utm_campaign=quote-follow-up`. The customer details have gone, but the UTM tags stay for your analytics.
+- Your server and proxy only ever receive the `?utm_…` part.
 
 URL-encode the values. Most CRMs do this for you, and `|` becomes `%7C`. The trade's own business details, logo and trust line always come from their saved settings, never from the link.
 
