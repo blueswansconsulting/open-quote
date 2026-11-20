@@ -9,6 +9,24 @@
 pub const PAGE_WIDTH: f32 = 595.0; // A4 in points
 pub const PAGE_HEIGHT: f32 = 842.0;
 
+/// Paper size. Content is laid out for A4's width, which also fits Letter.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Paper {
+    #[default]
+    A4,
+    Letter,
+}
+
+impl Paper {
+    /// (width, height) in points.
+    pub fn size(self) -> (f32, f32) {
+        match self {
+            Paper::A4 => (PAGE_WIDTH, PAGE_HEIGHT),
+            Paper::Letter => (612.0, 792.0),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Font {
     Regular,
@@ -325,7 +343,8 @@ fn pdf_string(s: &str) -> String {
 }
 
 /// Serialise pages (and any images they reference) into a complete PDF file.
-pub fn write_pdf(pages: &[Page], images: &[Jpeg]) -> Vec<u8> {
+pub fn write_pdf(pages: &[Page], images: &[Jpeg], paper: Paper) -> Vec<u8> {
+    let (page_w, page_h) = paper.size();
     // Assign object numbers up front so pages can reference images/annots.
     let first_image = 5;
     let mut next = first_image + images.len();
@@ -392,7 +411,7 @@ pub fn write_pdf(pages: &[Page], images: &[Jpeg]) -> Vec<u8> {
         };
         objects.push(
             format!(
-                "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {PAGE_WIDTH} {PAGE_HEIGHT}] \
+                "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {page_w} {page_h}] \
                  /Resources << /Font << /F1 3 0 R /F2 4 0 R >> /XObject << {xobjects} >> >> \
                  /Contents {content_id} 0 R{annots} >>"
             )
@@ -537,7 +556,7 @@ mod tests {
     fn xref_offsets_point_at_objects() {
         let mut p = Page::default();
         p.text(50.0, 800.0, Font::Bold, 12.0, 0.0, "Total £1,234.56");
-        let pdf = write_pdf(&[p, Page::default()], &[]);
+        let pdf = write_pdf(&[p, Page::default()], &[], Paper::A4);
         assert!(pdf.starts_with(b"%PDF-1.4"));
         assert!(pdf.ends_with(b"%%EOF\n"));
         let entries = xref_entries(&pdf);
@@ -546,6 +565,8 @@ mod tests {
             assert!(pdf[*off..].starts_with(format!("{} 0 obj", i + 1).as_bytes()));
         }
         assert!(contains(&pdf, b"/Count 2"));
+        let letter = write_pdf(&[Page::default()], &[], Paper::Letter);
+        assert!(contains(&letter, b"/MediaBox [0 0 612 792]"));
     }
 
     #[test]
@@ -554,7 +575,7 @@ mod tests {
         let mut p = Page::default();
         p.image(0, 50.0, 700.0, 100.0, 50.0);
         p.link(50.0, 30.0, 200.0, 10.0, "https://example.com/a(b)");
-        let pdf = write_pdf(&[p, Page::default()], &[img]);
+        let pdf = write_pdf(&[p, Page::default()], &[img], Paper::A4);
         let entries = xref_entries(&pdf);
         // catalog, pages, 2 fonts, 1 image, page1 + content + annot, page2 + content
         assert_eq!(entries.len(), 10);

@@ -4,7 +4,9 @@
 pub mod logo;
 pub mod pdf;
 pub mod quote;
+pub mod ratelimit;
 pub mod render;
+pub mod tax;
 
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -37,7 +39,12 @@ pub fn app() -> Router {
         .route("/healthz", get(|| async { "ok" }))
         .route("/api/stats", get(stats))
         .route("/api/logo", get(fetch_logo))
-        .route("/api/quote.pdf", post(make_pdf))
+        .route(
+            "/api/quote.pdf",
+            // The limit runs as middleware, before the (up to 6 MB) body is
+            // read, so an over-limit client can't make us buffer uploads.
+            post(make_pdf).route_layer(middleware::from_fn(limit_pdf)),
+        )
         .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
         .layer(middleware::map_response(security_headers))
 }
@@ -76,7 +83,30 @@ static LOGO_FETCHES: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(
 
 /// `GET /api/logo?url=https://…` downloads a logo for a prefill link. See
 /// [`logo`] for the SSRF protections. Nothing is stored or logged.
-async fn fetch_logo(Query(params): Query<HashMap<String, String>>) -> Response {
+/// Per-client limits. Logo downloads cost real outbound work; PDFs are cheap.
+static LOGO_LIMIT: std::sync::LazyLock<ratelimit::Limiter> =
+    std::sync::LazyLock::new(|| ratelimit::Limiter::new(30, std::time::Duration::from_secs(600)));
+static PDF_LIMIT: std::sync::LazyLock<ratelimit::Limiter> =
+    std::sync::LazyLock::new(|| ratelimit::Limiter::new(60, std::time::Duration::from_secs(60)));
+
+fn too_many(retry_after: u64, what: &str) -> Response {
+    let mut res = error(
+        StatusCode::TOO_MANY_REQUESTS,
+        format!("Too many {what}. Please wait a little and try again."),
+    );
+    if let Ok(v) = HeaderValue::from_str(&retry_after.to_string()) {
+        res.headers_mut().insert(header::RETRY_AFTER, v);
+    }
+    res
+}
+
+async fn fetch_logo(
+    ratelimit::ClientIp(ip): ratelimit::ClientIp,
+    Query(params): Query<HashMap<String, String>>,
+) -> Response {
+    if let Err(wait) = LOGO_LIMIT.check(ip) {
+        return too_many(wait, "logo downloads");
+    }
     let Some(url) = params.get("url").cloned() else {
         return error(StatusCode::BAD_REQUEST, "Add ?url=https://… for the logo");
     };
@@ -132,6 +162,17 @@ fn filename_for(quote_number: &str) -> String {
     } else {
         format!("quote-{safe}.pdf")
     }
+}
+
+async fn limit_pdf(
+    ratelimit::ClientIp(ip): ratelimit::ClientIp,
+    request: axum::extract::Request,
+    next: middleware::Next,
+) -> Response {
+    if let Err(wait) = PDF_LIMIT.check(ip) {
+        return too_many(wait, "quotes in a short time");
+    }
+    next.run(request).await
 }
 
 async fn make_pdf(payload: Result<Json<quote::QuoteRequest>, JsonRejection>) -> Response {

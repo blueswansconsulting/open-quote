@@ -190,3 +190,61 @@ async fn logo_endpoint_refuses_unsafe_urls() {
         assert!(v["error"].is_string(), "{path}");
     }
 }
+
+#[tokio::test]
+async fn logo_downloads_are_rate_limited_per_client() {
+    // Identify this test's client by a header so other tests aren't affected.
+    std::env::set_var("TRUSTED_CLIENT_IP_HEADER", "x-test-client");
+    let call = |ip: &'static str| async move {
+        let res = open_quote::app()
+            .oneshot(
+                Request::get("/api/logo?url=http%3A%2F%2Fexample.com%2Fl.png")
+                    .header("x-test-client", ip)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        (res.status(), res.headers().get("retry-after").cloned())
+    };
+    for _ in 0..30 {
+        assert_eq!(
+            call("203.0.113.50").await.0,
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
+    }
+    let (status, retry) = call("203.0.113.50").await;
+    assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+    assert!(retry.is_some());
+    // A different client is still served.
+    assert_eq!(
+        call("203.0.113.51").await.0,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+}
+
+#[tokio::test]
+async fn pdf_limit_is_checked_before_the_body_is_read() {
+    std::env::set_var("TRUSTED_CLIENT_IP_HEADER", "x-test-client");
+    let send = |body: String| async move {
+        open_quote::app()
+            .oneshot(
+                Request::post("/api/quote.pdf")
+                    .header("content-type", "application/json")
+                    .header("x-test-client", "203.0.113.77")
+                    .body(Body::from(body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap()
+            .status()
+    };
+    for _ in 0..60 {
+        assert_eq!(send(valid().to_string()).await, StatusCode::OK);
+    }
+    // Over the limit: rejected with 429 even for an oversized body, which
+    // would otherwise be read (and refused with 413) first.
+    let mut huge = valid();
+    huge["notes"] = json!("a".repeat(7 * 1024 * 1024));
+    assert_eq!(send(huge.to_string()).await, StatusCode::TOO_MANY_REQUESTS);
+}
